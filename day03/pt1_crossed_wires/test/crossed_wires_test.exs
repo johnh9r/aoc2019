@@ -9,7 +9,11 @@ defmodule CrossedWiresTest do
     [wire1: wire1, wire2: wire2]
   end
 
-  test "personal challenge data processed correctly", context do
+  test "part 1: personal challenge data processed correctly", context do
     assert CrossedWires.nearest_intersection(context[:wire1], context[:wire2]) == 293
+  end
+
+  test "part 2: personal challenge data processed correctly", context do
+    assert CrossedWires.nearest_intersection_by_path_length_sum(context[:wire1], context[:wire2]) == 27_306
   end
 end
