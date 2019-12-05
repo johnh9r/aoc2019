@@ -26,37 +26,29 @@ defmodule IntCodePlus do
   * type `Integer` in Elixir is arbitrary-precision so cannot overflow
   """
 
-  # XXX self-testing input?!
-  #
   @doc """
   iex> IntCodePlus.execute([1, 9, 10, 3, 2, 3, 11, 0, 99, 30, 40, 50])
-  [3500, 9, 10, 70, 2, 3, 11, 0, 99, 30, 40, 50]
+  {0xcafebabe, [3500, 9, 10, 70, 2, 3, 11, 0, 99, 30, 40, 50]}
 
   iex> IntCodePlus.execute([1, 0, 0, 0, 99])
-  [2, 0, 0, 0, 99]
+  {0xcafebabe, [2, 0, 0, 0, 99]}
 
   iex> IntCodePlus.execute([2, 3, 0, 3, 99])
-  [2, 3, 0, 6, 99]
+  {0xcafebabe, [2, 3, 0, 6, 99]}
 
   iex> IntCodePlus.execute([2, 4, 4, 5, 99, 0])
-  [2, 4, 4, 5, 99, 9801]
+  {0xcafebabe, [2, 4, 4, 5, 99, 9801]}
 
   iex> IntCodePlus.execute([1, 1, 1, 4, 99, 5, 6, 0, 99])
-  [30, 1, 1, 4, 2, 5, 6, 0, 99]
+  {0xcafebabe, [30, 1, 1, 4, 2, 5, 6, 0, 99]}
   """
-  # TODO return tuple to express single-value output: {integer, [integer]}
-  @spec execute([integer], integer) :: [integer]
+  @spec execute([integer], integer) :: {integer, [integer]}
   def execute(xs, input \\ 1)
-
-  @spec execute([integer], integer) :: [integer]
   def execute([], _), do: []
+  def execute(xs, input), do: _execute(xs, 0, input)
 
-  def execute(xs, input) do
-    _execute(xs, 0, input)
-  end
-
-  @spec _execute([integer], integer, integer) :: [integer]
-  defp _execute(xs, i, input) do
+  @spec _execute([integer], integer, integer, integer) :: {integer, [integer]}
+  defp _execute(xs, i, input, output \\ 0xcafebabe) do
     [op_param_modes] = cisc_at(xs, i, 1)
 
     op = op_param_modes |> Kernel.rem(100)
@@ -67,8 +59,7 @@ defmodule IntCodePlus do
     case op do
       # halt
       99 ->
-        # TODO return tuple to express single-value output: {integer, [integer]}
-        xs
+        {output, xs}
 
       # add
       1 ->
@@ -77,7 +68,7 @@ defmodule IntCodePlus do
 
         value = load_at!(xs, ld1off) + load_at!(xs, ld2off)
         store_at(xs, st_off, value)
-        |> _execute(i + insn_sz, input)
+        |> _execute(i + insn_sz, input, output)
 
       # mult
       2 ->
@@ -86,7 +77,7 @@ defmodule IntCodePlus do
 
         value = load_at!(xs, ld1off) * load_at!(xs, ld2off)
         store_at(xs, st_off, value)
-        |> _execute(i + insn_sz, input)
+        |> _execute(i + insn_sz, input, output)
 
       # store input from environment
       3 ->
@@ -94,15 +85,15 @@ defmodule IntCodePlus do
         [_, st_off] = cisc_at(xs, i, insn_sz)
 
         store_at(xs, st_off, input)
-        |> _execute(i + insn_sz, input)
+        |> _execute(i + insn_sz, input, output)
 
       # generate output to environment
       4 ->
         insn_sz = 2
         [_, ld_off] = cisc_at(xs, i, insn_sz)
 
-        # TODO
-        _output = load_at!(xs, ld_off)
+        output_value = load_at!(xs, ld_off)
+        _execute(i + insn_sz, input, output_value)
 
       _ ->
         []

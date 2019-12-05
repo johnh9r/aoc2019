@@ -55,6 +55,7 @@ defmodule IntCodeTestPlus do
   end
 
   test "personal challenge data processed correctly", context do
-    assert IntCodePlus.execute(context[:insn_data]) |> List.first() == 4_930_687
+    {0xcafebabe, memory} = IntCodePlus.execute(context[:insn_data])
+    assert(memory |> List.first() == 4_930_687)
   end
 end
