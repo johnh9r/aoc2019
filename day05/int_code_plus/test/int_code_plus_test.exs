@@ -46,7 +46,7 @@ defmodule IntCodeTestPlus do
       2, 0, 14, 0
     ]
 
-    insn_data_day5pt1 = [
+    insn_data_day5 = [
       3,225,
       1,225,6,6,
       1100,1,238,225,
@@ -113,22 +113,28 @@ defmodule IntCodeTestPlus do
     ]
 
     [
-      insn_data_day2pt1:
+      insn_data_day2:
         instructions_and_initalised_data
         |> List.replace_at(1, 12)
         |> List.replace_at(2, 2),
-      insn_data_day5pt1:
-        insn_data_day5pt1
+      insn_data_day5:
+        insn_data_day5
     ]
   end
 
   test "(day02pt1) personal challenge data processed correctly (without regressions)", context do
-    {0xcafebabe, memory} = IntCodePlus.execute(context[:insn_data_day2pt1])
+    {0xcafebabe, memory} = IntCodePlus.execute(context[:insn_data_day2])
     assert(memory |> List.first() == 4_930_687)
   end
 
   test "(day05pt1) personal challenge data processed correctly", context do
-    {output, _} = IntCodePlus.execute(context[:insn_data_day5pt1])
+    {output, _} = IntCodePlus.execute(context[:insn_data_day5])
     assert(output == 12_896_948)
+  end
+
+  test "(day05pt2) personal challenge data processed correctly", context do
+    system_id = 5
+    {output, _} = IntCodePlus.execute(context[:insn_data_day5], system_id)
+    assert(output == 7_704_130)
   end
 end

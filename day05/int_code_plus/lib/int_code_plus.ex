@@ -108,7 +108,64 @@ defmodule IntCodePlus do
           |> IO.inspect(label: "output")
         _execute(xs, i + insn_sz, input, output_value)
 
-      _ ->
+      # jmpnz
+      5 ->
+        insn_sz = 3
+        [_, ld_off, target] = cisc_at(xs, i, insn_sz)
+
+        load_param1 = loader_for(param_mode1)
+        load_param2 = loader_for(param_mode2)
+        if load_param1.(xs, ld_off) != 0 do
+          _execute(xs, load_param2.(xs, target), input, output)
+        else
+          _execute(xs, i + insn_sz, input, output)
+        end
+
+      # jmpz
+      6 ->
+        insn_sz = 3
+        [_, ld_off, target] = cisc_at(xs, i, insn_sz)
+
+        load_param1 = loader_for(param_mode1)
+        load_param2 = loader_for(param_mode2)
+        if load_param1.(xs, ld_off) == 0 do
+          _execute(xs, load_param2.(xs, target), input, output)
+        else
+          _execute(xs, i + insn_sz, input, output)
+        end
+
+      # stlt
+      7 ->
+        insn_sz = 4
+        [_, ld1off, ld2off, st_off] = cisc_at(xs, i, insn_sz)
+
+        load_param1 = loader_for(param_mode1)
+        load_param2 = loader_for(param_mode2)
+        value =
+          if load_param1.(xs, ld1off) < load_param2.(xs, ld2off),
+            do: 1,
+            else: 0
+
+        store_at(xs, st_off, value)
+        |> _execute(i + insn_sz, input, output)
+
+      # steq
+      8 ->
+        insn_sz = 4
+        [_, ld1off, ld2off, st_off] = cisc_at(xs, i, insn_sz)
+
+        load_param1 = loader_for(param_mode1)
+        load_param2 = loader_for(param_mode2)
+        value =
+          if load_param1.(xs, ld1off) == load_param2.(xs, ld2off),
+            do: 1,
+            else: 0
+
+        store_at(xs, st_off, value)
+        |> _execute(i + insn_sz, input, output)
+
+      x ->
+        Integer.to_string(x) |> IO.inspect(label: "unknown opcode")
         []
     end
   end
