@@ -26,6 +26,10 @@ defmodule IntCodePlus do
   * type `Integer` in Elixir is arbitrary-precision so cannot overflow
   """
 
+  # addressing modes for opcode parameters
+  @pos_mode 0
+  @imm_mode 1
+
   @doc """
   iex> IntCodePlus.execute([1, 9, 10, 3, 2, 3, 11, 0, 99, 30, 40, 50])
   {0xcafebabe, [3500, 9, 10, 70, 2, 3, 11, 0, 99, 30, 40, 50]}
@@ -52,9 +56,10 @@ defmodule IntCodePlus do
     [op_param_modes] = cisc_at(xs, i, 1)
 
     op = op_param_modes |> Kernel.rem(100)
-    _param_mode1 = op_param_modes |> Kernel.div(  100) |> Kernel.rem(10)
-    _param_mode2 = op_param_modes |> Kernel.div( 1000) |> Kernel.rem(10)
-    _param_mode3 = op_param_modes |> Kernel.div(10000) |> Kernel.rem(10)
+    param_mode1 = op_param_modes |> Kernel.div(  100) |> Kernel.rem(10)
+    param_mode2 = op_param_modes |> Kernel.div( 1000) |> Kernel.rem(10)
+    # "Parameters that an instruction writes to will never be in immediate mode."
+    0 = op_param_modes |> Kernel.div(10000) |> Kernel.rem(10)
 
     case op do
       # halt
@@ -66,7 +71,9 @@ defmodule IntCodePlus do
         insn_sz = 4
         [_, ld1off, ld2off, st_off] = cisc_at(xs, i, insn_sz)
 
-        value = load_at!(xs, ld1off) + load_at!(xs, ld2off)
+        load_param1 = loader_for(param_mode1)
+        load_param2 = loader_for(param_mode2)
+        value = load_param1.(xs, ld1off) + load_param2.(xs, ld2off)
         store_at(xs, st_off, value)
         |> _execute(i + insn_sz, input, output)
 
@@ -75,13 +82,16 @@ defmodule IntCodePlus do
         insn_sz = 4
         [_, ld1off, ld2off, st_off] = cisc_at(xs, i, insn_sz)
 
-        value = load_at!(xs, ld1off) * load_at!(xs, ld2off)
+        load_param1 = loader_for(param_mode1)
+        load_param2 = loader_for(param_mode2)
+        value = load_param1.(xs, ld1off) * load_param2.(xs, ld2off)
         store_at(xs, st_off, value)
         |> _execute(i + insn_sz, input, output)
 
       # store input from environment
       3 ->
         insn_sz = 2
+        # "Parameters that an instruction writes to will never be in immediate mode."
         [_, st_off] = cisc_at(xs, i, insn_sz)
 
         store_at(xs, st_off, input)
@@ -92,11 +102,24 @@ defmodule IntCodePlus do
         insn_sz = 2
         [_, ld_off] = cisc_at(xs, i, insn_sz)
 
-        output_value = load_at!(xs, ld_off)
-        _execute(i + insn_sz, input, output_value)
+        load_param1 = loader_for(param_mode1)
+        output_value =
+          load_param1.(xs, ld_off)
+          |> IO.inspect(label: "output")
+        _execute(xs, i + insn_sz, input, output_value)
 
       _ ->
         []
+    end
+  end
+
+  defp loader_for(param_mode) do
+    case param_mode do
+      @pos_mode ->
+        &load_at!/2
+
+      @imm_mode ->
+        fn _, x -> x end
     end
   end
 
