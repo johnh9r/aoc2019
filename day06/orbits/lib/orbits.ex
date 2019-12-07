@@ -3,9 +3,10 @@ defmodule Orbits do
   calculate total number of direct and indirect orbits from given input
 
   ##  assumptions
-  * DAG (i.e. loops physically non-sensical)
+  * DAG (e.g. no loops of mutually rotating pairs)
   * no duplicates (which could inadvertently prune tree data structure)
   * names of heavenly bodies may be arbitrary length and characters
+  * input should be consumed and tree built in single pass (sic!)
 
   ##  observations
   * input order is arbitrary, i.e. parent nodes not necessarily created before their children
@@ -29,7 +30,7 @@ defmodule Orbits do
     orbits_tsv
     |> String.split()
     |> Enum.reduce(
-      Map.new(com: %{}),
+      Map.new(_ctor_: %{}, com: %{}),
       fn orbit, tree -> insert_orbit(tree, String.split(orbit, ")")) end
     )
     |> Orbits.traverse_breadth_first()
@@ -48,7 +49,7 @@ defmodule Orbits do
   iex> Orbits.insert(%{com: %{}}, :com, :b)
   %{com: %{b: %{}}}
 
-  iex> Orbits.insert(%{com: %{com: %{b: %{}}}}, :b, :c)
+  iex> Orbits.insert(%{com: %{b: %{}}}, :b, :c)
   %{com: %{b: %{c: %{}}}}
 
   iex> Orbits.insert(%{com: %{b: %{c: %{}}}}, :b, :g)
@@ -56,12 +57,51 @@ defmodule Orbits do
 
   iex> Orbits.insert(%{com: %{b: %{c: %{}, g: %{}}}}, :g, :h)
   %{com: %{b: %{c: %{}, g: %{h: %{}}}}}
+
+  iex> Orbits.insert(%{_ctor_: %{}, com: %{b: %{c: %{}}}}, :g, :h)
+  %{_ctor_: %{g: %{h: %{}}}, com: %{b: %{c: %{}}}}
   """
+  @spec insert(map, atom, atom) :: map
   def insert(tree, parent, child) do
-    # by problem definition, tree always contains top-level :com
-    paths = traverse_breadth_first(tree)
-    # TODO
-    {}
+    # by problem definition, tree always contains top-level %{com: %{}}
+    tree
+    |> find_path(parent)
+    |> case do
+         [] ->
+           # save tree fragment for subsequent integration
+           Kernel.update_in(tree, [:_ctor_], &(Map.put(&1, parent, Map.new([{child, %{}}]))))
+         path ->
+           Kernel.update_in(tree, path, &(Map.put(&1, child, %{})))
+       end
+  end
+
+  @doc """
+  iex> Orbits.find_path(%{com: %{}}, :none_such)
+  []
+
+  iex> Orbits.find_path(%{com: %{}}, :com)
+  [:com]
+
+  iex> Orbits.find_path(%{com: %{b: %{c: %{}, g: %{h: %{}}}}}, :g)
+  [:com, :b, :g]
+
+  iex> Orbits.find_path(%{com: %{b: %{c: %{}, g: %{h: %{}}}}}, :h)
+  [:com, :b, :g, :h]
+  """
+  @spec find_path(map, atom) :: [atom]
+  def find_path(tree, node) do
+    traverse_breadth_first(tree)
+    # at least one node :com
+    |> Enum.find_value(
+      [],
+      fn t ->
+        ns = t |> Tuple.to_list()
+        case ns |> Enum.reverse() do
+          [^node | _] -> ns
+          _ -> false
+        end
+      end
+    )
   end
 
   @doc """

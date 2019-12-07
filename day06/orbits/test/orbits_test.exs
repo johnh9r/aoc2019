@@ -1,6 +1,6 @@
 defmodule OrbitsTest do
   use ExUnit.Case
-  doctest Orbits
+  doctest Orbits, only: [insert: 3]
 
   setup do
     my_orbits = """
@@ -942,7 +942,8 @@ defmodule OrbitsTest do
     [orbits_tsv: String.replace(my_orbits, "\n", "\t")]
   end
 
-  test "personal input is processed correctly", context do
+  @tag :challenge
+  test "personal challenge data is processed correctly", context do
     assert Orbits.total_orbits(context[:orbits_tsv]) == 0
   end
 end
