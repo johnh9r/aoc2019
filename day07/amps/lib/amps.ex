@@ -54,6 +54,12 @@ defmodule Amps do
     [3, 1, 2],
     [3, 2, 1]
   ]
+
+  ##  polyglot alternative: copy-and-paste Python output
+  import itertools
+  import pprint
+  pp = pprint.PrettyPrinter(indent=2)
+  pp.pprint(map(lambda t: map(lambda s: int(s), list(t)), itertools.permutations('01234')))
   """
   @spec permutations([integer]) :: [[integer]]
   def permutations([]), do: [[]]
