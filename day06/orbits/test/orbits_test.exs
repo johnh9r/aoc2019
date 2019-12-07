@@ -944,6 +944,6 @@ defmodule OrbitsTest do
 
   @tag :challenge
   test "personal challenge data is processed correctly", context do
-    assert Orbits.total_orbits(context[:orbits_tsv]) == 0
+    assert Orbits.total_orbits(context[:orbits_tsv]) == 119_831
   end
 end

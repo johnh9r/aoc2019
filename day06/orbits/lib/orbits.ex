@@ -59,7 +59,8 @@ defmodule Orbits do
           assemble(tree, branches) 
         path ->
           {loose_branch, weeded_branches} = branches |> Map.pop(k)
-          Kernel.update_in(tree, path, &(Map.put(&1, k, loose_branch)))
+          parent_path = path |> Enum.reverse() |> Enum.drop(1) |> Enum.reverse()
+          Kernel.update_in(tree, parent_path, &(Map.put(&1, k, loose_branch)))
           |> assemble(weeded_branches) 
        end
   end
