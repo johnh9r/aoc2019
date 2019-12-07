@@ -70,8 +70,8 @@ defmodule IntCode do
         List.replace_at(xs, st_off, Enum.fetch!(xs, ld1off) * Enum.fetch!(xs, ld2off))
         |> _execute(i + @insn_size)
 
-      _ ->
-        []
+      x ->
+        raise "unknown opcode: #{Integer.to_string(x)}"
     end
   end
 end
