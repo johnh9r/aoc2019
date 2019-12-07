@@ -3,21 +3,19 @@ defmodule Amps do
   determine maximum achievable thrust from exhaustive settings permutations across five amplifiers
   """
 
-  @settings_pt1 [0, 1, 2, 3, 4]
-
   @doc """
-  iex> Amps.max_thrust([3,15,3,16,1002,16,10,16,1,16,15,15,4,15,99,0,0])
+  iex> Amps.max_thrust([3,15,3,16,1002,16,10,16,1,16,15,15,4,15,99,0,0], [0,1,2,3,4])
   {43210, "43210"}
 
-  iex> Amps.max_thrust([3,23,3,24,1002,24,10,24,1002,23,-1,23,101,5,23,23,1,24,23,23,4,23,99,0,0])
+  iex> Amps.max_thrust([3,23,3,24,1002,24,10,24,1002,23,-1,23,101,5,23,23,1,24,23,23,4,23,99,0,0], [0,1,2,3,4])
   {54321, "01234"}
 
-  iex> Amps.max_thrust([3,31,3,32,1002,32,10,32,1001,31,-2,31,1007,31,0,33,1002,33,7,33,1,33,31,31,1,32,31,31,4,31,99,0,0,0])
+  iex> Amps.max_thrust([3,31,3,32,1002,32,10,32,1001,31,-2,31,1007,31,0,33,1002,33,7,33,1,33,31,31,1,32,31,31,4,31,99,0,0,0], [0,1,2,3,4])
   {65210, "10432"}
   """
-  @spec max_thrust([integer]) :: tuple
-  def max_thrust(firmware) do
-    permutations(@settings_pt1)
+  @spec max_thrust([integer], [integer]) :: tuple
+  def max_thrust(firmware, settings) do
+    permutations(settings)
     |> Enum.map(
       fn [phase_a, phase_b, phase_c, phase_d, phase_e] = phases ->
         # by problem definition, first input is zero
@@ -59,7 +57,7 @@ defmodule Amps do
   import itertools
   import pprint
   pp = pprint.PrettyPrinter(indent=2)
-  pp.pprint(map(lambda t: map(lambda s: int(s), list(t)), itertools.permutations('01234')))
+  pp.pprint(map(lambda t: map(lambda s: int(s), t), itertools.permutations('01234')))
   """
   @spec permutations([integer]) :: [[integer]]
   def permutations([]), do: [[]]
