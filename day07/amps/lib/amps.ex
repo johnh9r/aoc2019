@@ -1,6 +1,9 @@
 defmodule Amps do
   @moduledoc """
   determine maximum achievable thrust from exhaustive settings permutations across five amplifiers
+
+  ##  observations
+  * subtle hint of concurrency (pt1): "(If the amplifier has not yet received an input signal, it waits until one arrives.)"
   """
 
   @doc """
@@ -16,21 +19,21 @@ defmodule Amps do
   @spec max_thrust([integer], [integer]) :: tuple
   def max_thrust(firmware, settings) do
     permutations(settings)
-    |> Enum.map(
-      fn [phase_a, phase_b, phase_c, phase_d, phase_e] = phases ->
-        # by problem definition, first input is zero
-        {line_out_a, _} = IntCodeDoublePlus.execute(firmware, [phase_a, 0])
-        {line_out_b, _} = IntCodeDoublePlus.execute(firmware, [phase_b, line_out_a])
-        {line_out_c, _} = IntCodeDoublePlus.execute(firmware, [phase_c, line_out_b])
-        {line_out_d, _} = IntCodeDoublePlus.execute(firmware, [phase_d, line_out_c])
-        {line_out_e, _} = IntCodeDoublePlus.execute(firmware, [phase_e, line_out_d])
-        {
-          line_out_e,
-          phases |> Enum.map_join("", &Integer.to_string/1)
-        }
-      end
-    )
-    |> Enum.max_by(fn {thrust, phases} -> thrust end)
+    |> Enum.map(fn phases -> run_processes_pt1(firmware, phases) end)
+    |> Enum.max_by(fn {thrust, _phases} -> thrust end)
+  end
+
+  defp run_processes_pt1(firmware, [phase_a, phase_b, phase_c, phase_d, phase_e] = phases) do
+    # by problem definition, first input is zero
+    {line_out_a, _} = IntCodeDoublePlus.execute(firmware, [phase_a, 0])
+    {line_out_b, _} = IntCodeDoublePlus.execute(firmware, [phase_b, line_out_a])
+    {line_out_c, _} = IntCodeDoublePlus.execute(firmware, [phase_c, line_out_b])
+    {line_out_d, _} = IntCodeDoublePlus.execute(firmware, [phase_d, line_out_c])
+    {line_out_e, _} = IntCodeDoublePlus.execute(firmware, [phase_e, line_out_d])
+    {
+      line_out_e,
+      phases |> Enum.map_join("", &Integer.to_string/1)
+    }
   end
 
   @doc """
