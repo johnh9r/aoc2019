@@ -165,8 +165,7 @@ defmodule IntCodePlus do
         |> _execute(i + insn_sz, input, output)
 
       x ->
-        Integer.to_string(x) |> IO.inspect(label: "unknown opcode")
-        []
+        raise "unknown opcode: #{Integer.to_string(x)}"
     end
   end
 
