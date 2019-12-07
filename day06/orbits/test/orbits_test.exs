@@ -942,8 +942,13 @@ defmodule OrbitsTest do
     [orbits_tsv: String.replace(my_orbits, "\n", "\t")]
   end
 
-  @tag :challenge
-  test "personal challenge data is processed correctly", context do
+  @tag :challenge_pt1
+  test "(part 1) personal challenge data is processed correctly", context do
     assert Orbits.total_orbits(context[:orbits_tsv]) == 119_831
+  end
+
+  @tag :challenge_pt2
+  test "(part 2) personal challenge data is processed correctly", context do
+    assert Orbits.count_orbit_transfers(context[:orbits_tsv]) == 322
   end
 end

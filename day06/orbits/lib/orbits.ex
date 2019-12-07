@@ -21,12 +21,24 @@ defmodule Orbits do
   ```
   """
 
+  def count_orbit_transfers(orbits_tsv, this \\ :_you, that \\ :_san) do
+    orbits = build_orbits(orbits_tsv)
+
+    path_to_this = orbits |> _find_path_with_default(this, []) |> IO.inspect(limit: :infinity)
+    path_to_that = orbits |> _find_path_with_default(that, []) |> IO.inspect(limit: :infinity)
+  end
+
   @doc """
   iex> Orbits.total_orbits("COM)B B)C C)D D)E E)F B)G G)H D)I E)J J)K K)L")
   42
   """
   @spec total_orbits(String.t()) :: integer
   def total_orbits(orbits_tsv) do
+    build_orbits(orbits_tsv)
+    |> Enum.reduce(0, fn p, acc -> acc + tuple_size(p) - 1 end)
+  end
+
+  defp build_orbits(orbits_tsv) do
     forest =
       orbits_tsv
       |> String.split()
@@ -39,7 +51,6 @@ defmodule Orbits do
 
     assemble(tree, ctor)
     |> Orbits.traverse_breadth_first()
-    |> Enum.reduce(0, fn p, acc -> acc + tuple_size(p) - 1 end)
   end
 
   @spec assemble(map, map) :: map
@@ -120,9 +131,14 @@ defmodule Orbits do
   @spec find_path(map, atom) :: [atom]
   def find_path(tree, node) do
     traverse_breadth_first(tree)
+    |> _find_path_with_default(node, [])
+  end
+
+  defp _find_path_with_default(orbits, node, default_value) do
+    orbits
     # at least one node :_com
     |> Enum.find_value(
-      [],
+      default_value,
       fn t ->
         ns = t |> Tuple.to_list()
         case ns |> Enum.reverse() do
