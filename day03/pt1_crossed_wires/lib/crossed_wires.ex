@@ -115,8 +115,8 @@ defmodule CrossedWires do
 
             {coord_set_plus_polyline_segment, {curr_x, curr_y - count}, steps + count}
 
-          _ ->
-            1 / 0
+          x ->
+            raise "unknown direction: #{x}"
         end
       end
     )
