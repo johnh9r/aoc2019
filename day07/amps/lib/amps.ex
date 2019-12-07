@@ -1,4 +1,6 @@
 defmodule Amps do
+  use Task
+
   @moduledoc """
   determine maximum achievable thrust from exhaustive settings permutations across five amplifiers
 
@@ -19,7 +21,12 @@ defmodule Amps do
   @spec max_thrust([integer], [integer]) :: tuple
   def max_thrust(firmware, settings) do
     permutations(settings)
-    |> Enum.map(fn phases -> run_processes_pt1(firmware, phases) end)
+    |> Enum.map(
+      fn phases ->
+        # run_processes_pt1(firmware, phases)
+        run_sequential_processes(firmware, phases)
+      end
+    )
     |> Enum.max_by(fn {thrust, _phases} -> thrust end)
   end
 
@@ -30,6 +37,37 @@ defmodule Amps do
     {line_out_c, _} = IntCodeDoublePlus.execute(firmware, [phase_c, line_out_b])
     {line_out_d, _} = IntCodeDoublePlus.execute(firmware, [phase_d, line_out_c])
     {line_out_e, _} = IntCodeDoublePlus.execute(firmware, [phase_e, line_out_d])
+    {
+      line_out_e,
+      phases |> Enum.map_join("", &Integer.to_string/1)
+    }
+  end
+
+  # XXX alt-ve to above
+  # rough and ready process management: best effort or crash in flames
+  defp run_sequential_processes(firmware, [phase_a, phase_b, phase_c, phase_d, phase_e] = phases) do
+    # %Task{
+    #   owner: #PID<0.150.0>,
+    #   pid: #PID<0.151.0>,
+    #   ref: #Reference<0.3545205543.2033713154.216017>
+    # }
+
+    # by problem definition, first input is zero
+    task_a = Task.async(IntCodeDoublePlus, :execute, [firmware, [phase_a, 0]])
+    {line_out_a, _} = Task.await(task_a)
+
+    task_b = Task.async(IntCodeDoublePlus, :execute, [firmware, [phase_b, line_out_a]])
+    {line_out_b, _} = Task.await(task_b)
+
+    task_c = Task.async(IntCodeDoublePlus, :execute, [firmware, [phase_c, line_out_b]])
+    {line_out_c, _} = Task.await(task_c)
+
+    task_d = Task.async(IntCodeDoublePlus, :execute, [firmware, [phase_d, line_out_c]])
+    {line_out_d, _} = Task.await(task_d)
+
+    task_e = Task.async(IntCodeDoublePlus, :execute, [firmware, [phase_e, line_out_d]])
+    {line_out_e, _} = Task.await(task_e)
+
     {
       line_out_e,
       phases |> Enum.map_join("", &Integer.to_string/1)
