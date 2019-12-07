@@ -27,71 +27,99 @@ defmodule Orbits do
   """
   @spec total_orbits(String.t()) :: integer
   def total_orbits(orbits_tsv) do
-    orbits_tsv
-    |> String.split()
-    |> Enum.reduce(
-      Map.new(_ctor_: %{}, com: %{}),
-      fn orbit, tree -> insert_orbit(tree, String.split(orbit, ")")) end
-    )
+    forest =
+      orbits_tsv
+      |> String.split()
+      |> Enum.reduce(
+        Map.new(__ctor__: %{}, _com: %{}),
+        fn orbit, tree -> insert_orbit(tree, String.split(orbit, ")")) end
+      )
+
+    {ctor, tree} = forest |> Map.pop(:__ctor__)
+
+    assemble(tree, ctor)
     |> Orbits.traverse_breadth_first()
-    |> Kernel.length()
+    |> Enum.reduce(0, fn p, acc -> acc + tuple_size(p) - 1 end)
   end
 
+  @spec assemble(map, map) :: map
+  # cannot pattern match, since any map will match empty one
+  def assemble(tree, branches) when map_size(branches) == 0 do
+    tree
+  end
+
+  def assemble(tree, branches) do
+    # pick random as-yet disconnected branch
+    [k] = Map.keys(branches) |> Enum.shuffle() |> Enum.take(1)
+
+    tree |> find_path(k)
+    |> case do
+        [] ->
+          # try again with better luck (random key choice)
+          assemble(tree, branches) 
+        path ->
+          {loose_branch, weeded_branches} = branches |> Map.pop(k)
+          Kernel.update_in(tree, path, &(Map.put(&1, k, loose_branch)))
+          |> assemble(weeded_branches) 
+       end
+  end
+
+  # prepend underscore for valid Elixir atom without illegible quoting
   defp insert_orbit(tree, [parent | [child]]) do
     insert(
       tree,
-      parent |> String.downcase() |> String.to_atom(),
-      child |> String.downcase() |> String.to_atom()
+      "_" <> parent |> String.downcase() |> String.to_atom(),
+      "_" <> child |> String.downcase() |> String.to_atom()
     )
   end
 
   @doc """
-  iex> Orbits.insert(%{com: %{}}, :com, :b)
-  %{com: %{b: %{}}}
+  iex> Orbits.insert(%{_com: %{}}, :_com, :b)
+  %{_com: %{b: %{}}}
 
-  iex> Orbits.insert(%{com: %{b: %{}}}, :b, :c)
-  %{com: %{b: %{c: %{}}}}
+  iex> Orbits.insert(%{_com: %{b: %{}}}, :b, :c)
+  %{_com: %{b: %{c: %{}}}}
 
-  iex> Orbits.insert(%{com: %{b: %{c: %{}}}}, :b, :g)
-  %{com: %{b: %{c: %{}, g: %{}}}}
+  iex> Orbits.insert(%{_com: %{b: %{c: %{}}}}, :b, :g)
+  %{_com: %{b: %{c: %{}, g: %{}}}}
 
-  iex> Orbits.insert(%{com: %{b: %{c: %{}, g: %{}}}}, :g, :h)
-  %{com: %{b: %{c: %{}, g: %{h: %{}}}}}
+  iex> Orbits.insert(%{_com: %{b: %{c: %{}, g: %{}}}}, :g, :h)
+  %{_com: %{b: %{c: %{}, g: %{h: %{}}}}}
 
-  iex> Orbits.insert(%{_ctor_: %{}, com: %{b: %{c: %{}}}}, :g, :h)
-  %{_ctor_: %{g: %{h: %{}}}, com: %{b: %{c: %{}}}}
+  iex> Orbits.insert(%{__ctor__: %{}, _com: %{b: %{c: %{}}}}, :g, :h)
+  %{__ctor__: %{g: %{h: %{}}}, _com: %{b: %{c: %{}}}}
   """
   @spec insert(map, atom, atom) :: map
   def insert(tree, parent, child) do
-    # by problem definition, tree always contains top-level %{com: %{}}
+    # by problem definition, tree always contains top-level %{_com: %{}}
     tree
     |> find_path(parent)
     |> case do
          [] ->
            # save tree fragment for subsequent integration
-           Kernel.update_in(tree, [:_ctor_], &(Map.put(&1, parent, Map.new([{child, %{}}]))))
+           Kernel.update_in(tree, [:__ctor__], &(Map.put(&1, parent, Map.new([{child, %{}}]))))
          path ->
            Kernel.update_in(tree, path, &(Map.put(&1, child, %{})))
        end
   end
 
   @doc """
-  iex> Orbits.find_path(%{com: %{}}, :none_such)
+  iex> Orbits.find_path(%{_com: %{}}, :none_such)
   []
 
-  iex> Orbits.find_path(%{com: %{}}, :com)
-  [:com]
+  iex> Orbits.find_path(%{_com: %{}}, :_com)
+  [:_com]
 
-  iex> Orbits.find_path(%{com: %{b: %{c: %{}, g: %{h: %{}}}}}, :g)
-  [:com, :b, :g]
+  iex> Orbits.find_path(%{_com: %{b: %{c: %{}, g: %{h: %{}}}}}, :g)
+  [:_com, :b, :g]
 
-  iex> Orbits.find_path(%{com: %{b: %{c: %{}, g: %{h: %{}}}}}, :h)
-  [:com, :b, :g, :h]
+  iex> Orbits.find_path(%{_com: %{b: %{c: %{}, g: %{h: %{}}}}}, :h)
+  [:_com, :b, :g, :h]
   """
   @spec find_path(map, atom) :: [atom]
   def find_path(tree, node) do
     traverse_breadth_first(tree)
-    # at least one node :com
+    # at least one node :_com
     |> Enum.find_value(
       [],
       fn t ->
@@ -108,17 +136,17 @@ defmodule Orbits do
   iex> Orbits.traverse_breadth_first(%{})
   []
 
-  iex> Orbits.traverse_breadth_first(%{com: %{}})
-  [{:com}]
+  iex> Orbits.traverse_breadth_first(%{_com: %{}})
+  [{:_com}]
 
-  iex> Orbits.traverse_breadth_first(%{com: %{b: %{}}})
-  [{:com}, {:com, :b}]
+  iex> Orbits.traverse_breadth_first(%{_com: %{b: %{}}})
+  [{:_com}, {:_com, :b}]
 
-  iex> Orbits.traverse_breadth_first(%{com: %{b: %{}, g: %{}}})
-  [{:com}, {:com, :b}, {:com, :g}]
+  iex> Orbits.traverse_breadth_first(%{_com: %{b: %{}, g: %{}}})
+  [{:_com}, {:_com, :b}, {:_com, :g}]
 
-  iex> Orbits.traverse_breadth_first(%{com: %{b: %{c: %{}, g: %{h: %{}}}}})
-  [{:com}, {:com, :b}, {:com, :b, :c}, {:com, :b, :g}, {:com, :b, :g, :h}]
+  iex> Orbits.traverse_breadth_first(%{_com: %{b: %{c: %{}, g: %{h: %{}}}}})
+  [{:_com}, {:_com, :b}, {:_com, :b, :c}, {:_com, :b, :g}, {:_com, :b, :g, :h}]
   """
   @spec traverse_breadth_first(map) :: []
   def traverse_breadth_first(tree) do
@@ -152,7 +180,7 @@ defmodule Orbits do
   # iex> Orbits.count_leaf_nodes(%{})
   # 0
   #
-  # iex> Orbits.count_leaf_nodes(%{com: %{b: %{c: %{}, g: %{h: %{}}}}})
+  # iex> Orbits.count_leaf_nodes(%{_com: %{b: %{c: %{}, g: %{h: %{}}}}})
   # 2
   # """
   # @spec count_leaf_nodes(map) :: integer

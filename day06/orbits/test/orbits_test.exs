@@ -1,6 +1,6 @@
 defmodule OrbitsTest do
   use ExUnit.Case
-  doctest Orbits, only: [insert: 3]
+  doctest Orbits
 
   setup do
     my_orbits = """
