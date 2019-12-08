@@ -4,6 +4,71 @@ defmodule SpaceImageFormat do
   """
 
   @doc """
+  iex> SpaceImageFormat.decode_sif_image("0222112222120000", 2, 2)
+  "#.\n.#"
+  """
+  @spec decode_sif_image(String.t, integer, integer) :: String.t
+  def decode_sif_image(sif_data_s, width, height) do
+    layers =
+      sif_data_s
+      |> convert()
+      |> as_layers(width, height)
+
+    Enum.zip(layers)
+    |> Enum.reduce(
+      [],
+      # top-most (i.e. left-most in pixel_stack tuple) is pixel from first layer
+      fn pixel_stack, acc ->
+        visible_pixel =
+          pixel_stack
+          |> Tuple.to_list
+          |> pick_dominant_pixel()
+        # mild performance optimisation: prepend at head of list
+        [visible_pixel | acc]
+      end
+    )
+    |> Enum.reverse()
+    |> Enum.chunk_every(width)
+    |> Enum.map(fn pixel_line -> Enum.join(pixel_line) end)
+    |> Enum.join("\n")
+    |> String.replace(~r/2/, " ",[:global])
+    |> String.replace(~r/1/, ".",[:global])
+    |> String.replace(~r/0/, "#",[:global])
+    |> IO.inspect(label: "\n", pretty: true, limit: :infinity)
+  end
+
+  @doc """
+  iex> SpaceImageFormat.pick_dominant_pixel([0,1,2,0])
+  0
+
+  iex> SpaceImageFormat.pick_dominant_pixel([2,1,2,0])
+  1
+
+  iex> SpaceImageFormat.pick_dominant_pixel([2,2,1,0])
+  1
+
+  iex> SpaceImageFormat.pick_dominant_pixel([2,2,2,0])
+  0
+  """
+  @spec pick_dominant_pixel([integer]) :: integer
+  def pick_dominant_pixel(pixels) do
+    # @transparent 2
+    # @white       1
+    # @black       0
+    pixels
+    |> Enum.reduce(
+      2,
+      fn pixel, acc ->
+        case {acc, pixel} do
+          {2, p} -> p
+          {1, _} -> 1
+          {0, _} -> 0
+        end
+      end
+    )
+  end
+
+  @doc """
   ```
   Layer 1: 123
            456
@@ -44,11 +109,10 @@ defmodule SpaceImageFormat do
   # XXX represent each layer as contiguous pixel stream (w/o reflecting 2-d structure)
   @spec as_layers([integer], integer, integer) :: [[integer]]
   def as_layers(sif_data, width, height) do
-    layers =
-      sif_data
-      |> Stream.chunk_every(width * height)
-      # XXX force evaluation for doctest
-      |> Enum.map(&(&1))
+    sif_data
+    |> Stream.chunk_every(width * height)
+    # XXX force evaluation for doctest
+    |> Enum.map(&(&1))
   end
 
   @doc """
