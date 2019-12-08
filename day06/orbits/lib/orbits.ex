@@ -21,11 +21,55 @@ defmodule Orbits do
   ```
   """
 
-  def count_orbit_transfers(orbits_tsv, this \\ :_you, that \\ :_san) do
+  @doc """
+			    YOU
+			   /
+	  G - H       J - K - L
+	 /           /
+  COM - B - C - D - E - F
+		 \
+		  I - SAN
+
+  iex> Orbits.count_orbit_transfers("COM)B B)C C)D D)E E)F B)G G)H D)I I)SAN E)J J)K K)L K)YOU")
+  4
+  """
+  @spec count_orbit_transfers(String.t(), atom, atom) :: integer
+  def count_orbit_transfers(orbits_tsv, one \\ :_you, other \\ :_san) do
     orbits = build_orbits(orbits_tsv)
 
-    path_to_this = orbits |> _find_path_with_default(this, []) |> IO.inspect(limit: :infinity)
-    path_to_that = orbits |> _find_path_with_default(that, []) |> IO.inspect(limit: :infinity)
+    path_to_one = orbits |> _find_path_with_default(one, [])
+    path_to_other = orbits |> _find_path_with_default(other, [])
+
+    common_path =
+      Enum.zip(path_to_one, path_to_other)
+      |> Enum.reduce(
+	[],
+	fn corresponding_bodies_by_path_length, acc ->
+	  case corresponding_bodies_by_path_length do
+	    # record leading common steps (if any)
+	    {common_body, common_body} ->
+	      acc ++ [common_body]
+
+	    {one_body, other_body} ->
+	      acc
+	  end
+	end
+      )
+
+    path_one_to_intersection_excl =
+      path_to_one
+      |> Enum.drop(length(common_path))
+      |> Enum.reverse()
+
+    # keep last common body (intersection) on only other side
+    path_intersection_to_other =
+      path_to_other
+      |> Enum.drop(length(common_path) - 1)
+
+    # count hops (not bodies), ignoring both targets
+    path_one_to_intersection_excl ++ path_intersection_to_other
+    |> Kernel.length()
+    |> Kernel.-(2 + 1)
   end
 
   @doc """
