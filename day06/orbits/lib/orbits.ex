@@ -10,15 +10,6 @@ defmodule Orbits do
 
   ##  observations
   * input order is arbitrary, i.e. parent nodes not necessarily created before their children
-
-  ##  illustration
-  ```
-	  G - H       J - K - L
-	 /           /
-  COM - B - C - D - E - F
-		 \
-		  I
-  ```
   """
 
   @doc """
@@ -82,7 +73,25 @@ defmodule Orbits do
     |> Enum.reduce(0, fn p, acc -> acc + tuple_size(p) - 1 end)
   end
 
-  defp build_orbits(orbits_tsv) do
+  @doc """
+  iex> Orbits.build_orbits("COM)B B)C C)D D)E E)F B)G G)H D)I E)J J)K K)L")
+  [
+    {:_com},
+    {:_com, :_b},
+    {:_com, :_b, :_c},
+    {:_com, :_b, :_g},
+    {:_com, :_b, :_c, :_d},
+    {:_com, :_b, :_g, :_h},
+    {:_com, :_b, :_c, :_d, :_e},
+    {:_com, :_b, :_c, :_d, :_i},
+    {:_com, :_b, :_c, :_d, :_e, :_f},
+    {:_com, :_b, :_c, :_d, :_e, :_j},
+    {:_com, :_b, :_c, :_d, :_e, :_j, :_k},
+    {:_com, :_b, :_c, :_d, :_e, :_j, :_k, :_l}
+  ]
+  """
+  @spec build_orbits(String.t()) :: [{atom}]
+  def build_orbits(orbits_tsv) do
     forest =
       orbits_tsv
       |> String.split()
