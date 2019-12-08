@@ -1,7 +1,7 @@
 defmodule AmpsTest do
   use ExUnit.Case
   doctest IntCodeDoublePlus, only: []
-  doctest Amps, only: [max_thrust: 2]
+  doctest Amps, only: [max_feedback_thrust: 2]
 
   setup do
     my_firmware = [
