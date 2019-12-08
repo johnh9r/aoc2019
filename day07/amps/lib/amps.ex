@@ -26,25 +26,11 @@ defmodule Amps do
     permutations(settings)
     |> Enum.map(
       fn phases ->
-        # run_processes_pt1(firmware, phases)
         run_sequential_processes(firmware, phases)
       end
     )
     |> Enum.max_by(fn {thrust, _phases} -> thrust end)
   end
-
-  # defp run_processes_pt1(firmware, [phase_a, phase_b, phase_c, phase_d, phase_e] = phases) do
-  #   # by problem definition, first input is zero
-  #   {line_out_a, _} = IntCodeDoublePlus.execute(firmware, [phase_a, 0])
-  #   {line_out_b, _} = IntCodeDoublePlus.execute(firmware, [phase_b, line_out_a])
-  #   {line_out_c, _} = IntCodeDoublePlus.execute(firmware, [phase_c, line_out_b])
-  #   {line_out_d, _} = IntCodeDoublePlus.execute(firmware, [phase_d, line_out_c])
-  #   {line_out_e, _} = IntCodeDoublePlus.execute(firmware, [phase_e, line_out_d])
-  #   {
-  #     line_out_e,
-  #     phases |> Enum.map_join("", &Integer.to_string/1)
-  #   }
-  # end
 
   # rough and ready process management: best effort or crash in flames
   #
@@ -54,40 +40,41 @@ defmodule Amps do
   #   ref: #Reference<0.3545205543.2033713154.216017>
   # }
   defp run_sequential_processes(firmware, phases) do
-    tasks =
-      Stream.repeatedly(
-        fn -> Task.async(
-          IntCodeDoublePlus,
-          :execute,
-          [
-            firmware,
-            fn -> receive do {value} -> value end end
-          ]
-        )
-        end
-      )
-      |> Enum.take(length(phases))
+    result_collector_task =
+      Task.async(fn -> receive do {value} -> value end end)
 
     # process mailbox acting like list parameter, e.g. [phase_a, ...]
-    # initialise processes according to wiring diagram;
-    Enum.zip(tasks, phases)
-    |> Enum.map(fn {task, phase} -> Process.send(task.pid, {phase}, @no_opts) end)
-
-    result =
-      tasks
+    tasks_with_phase_init =
+      phases
+      |> Enum.reverse()
+      # build process list backwards, so each stage know its successor
       |> Enum.reduce(
-        # by problem definition, first input is zero
-        0,
-        fn task, prev_result ->
-          Process.send(task.pid, {prev_result}, @no_opts)
-          {result, _} = Task.await(task)
-          result
+        [result_collector_task],
+        fn phase, [successor_task | _] = acc ->
+          task = Task.async(
+            IntCodeDoublePlus,
+            :execute,
+            [
+              firmware,
+              # both (in/out) from perspective of IntCode machine
+              fn -> receive do {value} -> value end end,
+              fn value -> Process.send(successor_task.pid, {value}, @no_opts) end
+            ]
+          )
+          Process.send(task.pid, {phase}, @no_opts)
+          [task | acc]
         end
       )
 
-    # TODO msg-based output
+    # by problem definition, first input is zero
+    first_task =
+      tasks_with_phase_init
+      |> List.first()
+
+    Process.send(first_task.pid, {0}, @no_opts)
+
     {
-      result,
+      Task.await(result_collector_task),
       phases |> Enum.map_join("", &Integer.to_string/1)
     }
   end
