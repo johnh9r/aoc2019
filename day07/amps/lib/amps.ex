@@ -8,6 +8,9 @@ defmodule Amps do
   * subtle hint of concurrency (pt1): "(If the amplifier has not yet received an input signal, it waits until one arrives.)"
   """
 
+  # Process.send(pid, msg, opts)
+  @no_opts []
+
   @doc """
   iex> Amps.max_thrust([3,15,3,16,1002,16,10,16,1,16,15,15,4,15,99,0,0], [0,1,2,3,4])
   {43210, "43210"}
@@ -30,46 +33,61 @@ defmodule Amps do
     |> Enum.max_by(fn {thrust, _phases} -> thrust end)
   end
 
-  defp run_processes_pt1(firmware, [phase_a, phase_b, phase_c, phase_d, phase_e] = phases) do
-    # by problem definition, first input is zero
-    {line_out_a, _} = IntCodeDoublePlus.execute(firmware, [phase_a, 0])
-    {line_out_b, _} = IntCodeDoublePlus.execute(firmware, [phase_b, line_out_a])
-    {line_out_c, _} = IntCodeDoublePlus.execute(firmware, [phase_c, line_out_b])
-    {line_out_d, _} = IntCodeDoublePlus.execute(firmware, [phase_d, line_out_c])
-    {line_out_e, _} = IntCodeDoublePlus.execute(firmware, [phase_e, line_out_d])
-    {
-      line_out_e,
-      phases |> Enum.map_join("", &Integer.to_string/1)
-    }
-  end
+  # defp run_processes_pt1(firmware, [phase_a, phase_b, phase_c, phase_d, phase_e] = phases) do
+  #   # by problem definition, first input is zero
+  #   {line_out_a, _} = IntCodeDoublePlus.execute(firmware, [phase_a, 0])
+  #   {line_out_b, _} = IntCodeDoublePlus.execute(firmware, [phase_b, line_out_a])
+  #   {line_out_c, _} = IntCodeDoublePlus.execute(firmware, [phase_c, line_out_b])
+  #   {line_out_d, _} = IntCodeDoublePlus.execute(firmware, [phase_d, line_out_c])
+  #   {line_out_e, _} = IntCodeDoublePlus.execute(firmware, [phase_e, line_out_d])
+  #   {
+  #     line_out_e,
+  #     phases |> Enum.map_join("", &Integer.to_string/1)
+  #   }
+  # end
 
-  # XXX alt-ve to above
   # rough and ready process management: best effort or crash in flames
-  defp run_sequential_processes(firmware, [phase_a, phase_b, phase_c, phase_d, phase_e] = phases) do
-    # %Task{
-    #   owner: #PID<0.150.0>,
-    #   pid: #PID<0.151.0>,
-    #   ref: #Reference<0.3545205543.2033713154.216017>
-    # }
+  #
+  # %Task{
+  #   owner: #PID<0.150.0>,
+  #   pid: #PID<0.151.0>,
+  #   ref: #Reference<0.3545205543.2033713154.216017>
+  # }
+  defp run_sequential_processes(firmware, phases) do
+    tasks =
+      Stream.repeatedly(
+        fn -> Task.async(
+          IntCodeDoublePlus,
+          :execute,
+          [
+            firmware,
+            fn -> receive do {value} -> value end end
+          ]
+        )
+        end
+      )
+      |> Enum.take(length(phases))
 
-    # by problem definition, first input is zero
-    task_a = Task.async(IntCodeDoublePlus, :execute, [firmware, [phase_a, 0]])
-    {line_out_a, _} = Task.await(task_a)
+    # process mailbox acting like list parameter, e.g. [phase_a, ...]
+    # initialise processes according to wiring diagram;
+    Enum.zip(tasks, phases)
+    |> Enum.map(fn {task, phase} -> Process.send(task.pid, {phase}, @no_opts) end)
 
-    task_b = Task.async(IntCodeDoublePlus, :execute, [firmware, [phase_b, line_out_a]])
-    {line_out_b, _} = Task.await(task_b)
+    result =
+      tasks
+      |> Enum.reduce(
+        # by problem definition, first input is zero
+        0,
+        fn task, prev_result ->
+          Process.send(task.pid, {prev_result}, @no_opts)
+          {result, _} = Task.await(task)
+          result
+        end
+      )
 
-    task_c = Task.async(IntCodeDoublePlus, :execute, [firmware, [phase_c, line_out_b]])
-    {line_out_c, _} = Task.await(task_c)
-
-    task_d = Task.async(IntCodeDoublePlus, :execute, [firmware, [phase_d, line_out_c]])
-    {line_out_d, _} = Task.await(task_d)
-
-    task_e = Task.async(IntCodeDoublePlus, :execute, [firmware, [phase_e, line_out_d]])
-    {line_out_e, _} = Task.await(task_e)
-
+    # TODO msg-based output
     {
-      line_out_e,
+      result,
       phases |> Enum.map_join("", &Integer.to_string/1)
     }
   end
