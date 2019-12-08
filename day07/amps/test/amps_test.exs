@@ -23,6 +23,6 @@ defmodule AmpsTest do
   # TODO  blocking queues between communicating concurrent processes (e.g. mailboxes in Elixir?!)
   @tag :challenge_pt2
   test "(part 2) personal challenge firmware calculates truly max thrust achievable", context do
-    assert Amps.max_thrust(context[:firmware], context[:settings_pt2]) == {0, "....."}
+    assert Amps.max_feedback_thrust(context[:firmware], context[:settings_pt2]) == {21596786, "95867"}
   end
 end

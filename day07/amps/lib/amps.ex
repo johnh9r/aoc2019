@@ -104,7 +104,7 @@ defmodule Amps do
     tasks_with_phase_init =
       phases
       |> Enum.reverse()
-      # build process list backwards, so each stage know its successor
+      # build process list backwards, so each stage knows its successor
       |> Enum.reduce(
         [result_collector_task],
         fn phase, [successor_task | _] = acc ->
@@ -140,16 +140,18 @@ defmodule Amps do
 
   defp collect_result(loop_pid) do
     receive do
-      # one-off tail-recursive call to remember PID
+      # tail-recursive call to remember PID and iterate over feedback loop passes
       {:pid, first_task_pid} ->
         first_task_pid
-        |> IO.inspect(label: "\npid1st")
         |> collect_result()
       {value} ->
-        # feedback loop
-        Process.send(loop_pid, {value}, @no_opts)
-        # XXX
-        IO.inspect(value, label: "\ncollected")
+        if Process.alive?(loop_pid) do
+          # feedback loop
+          Process.send(loop_pid, {value}, @no_opts)
+          collect_result(loop_pid)
+        else
+          value
+        end
     end
   end
 
