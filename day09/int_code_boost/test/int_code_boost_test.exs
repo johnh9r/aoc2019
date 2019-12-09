@@ -64,12 +64,18 @@ defmodule IntCodeBoostTest do
 
     [
       firmware: my_firmware,
-      exec_mode: 1
+      exec_mode_pt1: 1,
+      exec_mode_pt2: 2
     ]
   end
 
   @tag :challenge_pt1
   test "(part 1) processed personal challenge data correctly", context do
-    assert IntCodeBoost.execute_with_inputs(context[:firmware], [context[:exec_mode]]) == 0
+    assert IntCodeBoost.execute_with_inputs(context[:firmware], [context[:exec_mode_pt1]]) == 3_335_138_414
+  end
+
+  @tag :challenge_pt2
+  test "(part 2) processed personal challenge data correctly", context do
+    assert IntCodeBoost.execute_with_inputs(context[:firmware], [context[:exec_mode_pt2]]) == 49_122
   end
 end

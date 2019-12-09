@@ -27,7 +27,7 @@ defmodule IntCodeBoost do
     inputs
     |> Enum.map(fn value -> Process.send(task.pid, {value}, @no_opts) end)
 
-    Task.await(task)
+    Task.await(task, :infinity)
 
     receive do
       {result} -> result
