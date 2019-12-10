@@ -1,6 +1,6 @@
 defmodule AsteroidsTest do
   use ExUnit.Case
-  doctest Asteroids, only: [calc_optimum_monitoring_location: 1, parse_map: 1]
+  doctest Asteroids, only: [count_360deg_scan: 4] #[calc_optimum_monitoring_location: 1]
 
   setup do
     my_asteroid_map = """
@@ -37,7 +37,7 @@ defmodule AsteroidsTest do
 
   @tag :challenge_pt1
   test "(part 1) processes personal challenge correctly", context do
-    assert Asteroids.calc_optimum_monitoring_location(context[:asteroid_map]) == {0,0}
+    assert Asteroids.calc_optimum_monitoring_location(context[:asteroid_map]) == {{19, 14}, 274}
   end
 
   @tag :challenge_pt2
