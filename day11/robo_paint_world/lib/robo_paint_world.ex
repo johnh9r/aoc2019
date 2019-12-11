@@ -12,8 +12,8 @@ defmodule RoboPaintWorld do
     @moduledoc """
     maintain state _between_ callbacks from IntCode[Boost] robot process
 
-    IDEA: %{ {x, y} => [..., {:wht, 4}, {:blk, 0}] }
-    IDEA: Keyword list  [panels: %{see above}, location: {0,0}, next: "P[aint]|M[ove]"]
+    IDEA: %{ {x, y} => [..., {:wht, 4}, {:blk, -1}] }
+    IDEA: Keyword list  [panels: %{see above}, location: {2,1}, direction: :north,  next_action: :paint, movement_counter: 5]
 
     ## notes from problem definition
     1. (input to robot)    detect colour of panel in current location (0|1)
@@ -66,8 +66,9 @@ defmodule RoboPaintWorld do
     @spec handle_input_request() :: {integer}
     def handle_input_request() do
       # restore context to answer question
-      [panels: panels, location: location, direction: _direction, next_action: _, movement_counter: _] =
-        Agent.get(__MODULE__, fn state -> state end)
+      kw = Agent.get(__MODULE__, fn state -> state end)
+      panels = Keyword.fetch!(kw, :panels)
+      location = Keyword.fetch!(kw, :location)
 
       # newly reached panels initialised during movement (or at start-up)
       [{colour, _step} | _] = panels[location]
@@ -82,8 +83,8 @@ defmodule RoboPaintWorld do
     @spec handle_output_request(integer) :: {:ok}
     def handle_output_request(value) do
       # restore context to change world
-      [panels: _, location: _, direction: _, next_action: action, movement_counter: _] =
-        Agent.get(__MODULE__, fn state -> state end)
+      kw = Agent.get(__MODULE__, fn state -> state end)
+      action = Keyword.fetch!(kw, :next_action)
 
       # in this scenario (single client), no safety or performance concerns
       # over executing functions on agent
@@ -91,18 +92,30 @@ defmodule RoboPaintWorld do
         @do_paint ->
           Agent.update(
             __MODULE__,
-            fn [panels: panels, location: location, direction: _, next_action: _, movement_counter: movement_counter] = state ->
+            fn state ->
+              panels = Keyword.fetch!(state, :panels)
+              location = Keyword.fetch!(state, :location)
+              movement_counter = Keyword.fetch!(state, :movement_counter)
+
+              # XXX closure over value?!
               {_, new_panels} =
-                Map.get_and_update!(panels, location, fn value -> {value, [{@blk, movement_counter} | value]} end)
+                Map.get_and_update!(
+                  panels,
+                  location,
+                  fn history ->
+                    {history, [{value, movement_counter} | history]}
+                  end
+                )
 
               Keyword.merge(
                 state, [
                   panels: new_panels,
                   # location: ...
                   # direction: ...
-                  next_action: @turn_and_move,
+                  next_action: @do_move,
                   # movement_counter: ...
                 ]
+                # |> IO.inspect(label: "\npainted")
               )
             end
           ) 
@@ -110,8 +123,15 @@ defmodule RoboPaintWorld do
         @do_move ->
           Agent.update(
             __MODULE__,
-            fn [panels: panels, location: location, direction: direction, next_action: _, movement_counter: movement_counter] = state ->
-              [new_location, new_direction] = next_location_and_direction(location, direction, value)
+            fn state ->
+              panels = Keyword.fetch!(state, :panels)
+              location = Keyword.fetch!(state, :location)
+              direction = Keyword.fetch!(state, :direction)
+              movement_counter = Keyword.fetch!(state, :movement_counter)
+
+              # XXX closure over value?!
+              {new_location, new_direction} = next_location_and_direction(location, direction, value)
+
               # default square to black iff newly discovered
               new_panels = Map.put_new(panels, new_location, [{@blk, @preexisting}])
               Keyword.merge(
@@ -122,6 +142,7 @@ defmodule RoboPaintWorld do
                   next_action: @do_paint,
                   movement_counter: movement_counter + 1
                 ]
+                # |> IO.inspect(label: "\nmoved")
               )
             end
           ) 
@@ -166,6 +187,7 @@ defmodule RoboPaintWorld do
         end
 
       {{x + dx, y + dy}, new_direction}
+      # |> IO.inspect(label: "\nloc_dir")
     end
 
     # auxiliary methods to share select constants with enclosing module
@@ -191,17 +213,21 @@ defmodule RoboPaintWorld do
         next_action: WorldAffairs.paint(),
         movement_counter: 0
       ]
+      # |> IO.inspect(label: "\ninit")
     )
 
     run_robot(firmware)
 
-    [panels: panels, location: _, next_action: _, direction: _, next_action: _, movement_counter: _] =
-      WorldAffairs.get_final_state()
+    kw = WorldAffairs.get_final_state()
     
     # ignore panels that were only coloured by default (which must be its most recent history)
-    panels
+    Keyword.fetch!(kw, :panels)
     |> Map.to_list()
-    |> Enum.reject(fn [{colour, age} | _] -> {colour, age} == {WorldAffairs.black(), WorldAffairs.preexisting()} end)
+    |> Enum.reject(
+      fn {{_x, _y}, [{colour, age} | _]} = square ->
+        {colour, age} == {WorldAffairs.black(), WorldAffairs.preexisting()}
+      end
+    )
     |> Kernel.length()
   end
 
@@ -221,7 +247,7 @@ defmodule RoboPaintWorld do
       ]
     )
 
-    Task.await(task)
+    Task.await(task, :infinity)
     {:ok}
   end
 end
