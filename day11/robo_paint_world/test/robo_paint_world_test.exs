@@ -16,8 +16,18 @@ defmodule RoboPaintWorldTest do
   end
 
   @tag :challenge_pt2
-  test "(part2) processed personal challenge correctly", _context do
-    # TODO
-    assert false
+  test "(part2) processed personal challenge correctly", context do
+    assert RoboPaintWorld.paint_registration_markings(context[:firmware]) == "(see below)"
   end
+
+  # vvv WxH = 40x6 = 8 chars of 5x6 = JKZLZJBH (written upside-down)
+
+  #  #  ###  ##  #### #### #### #  #  ##
+  #  # #  # #  #    #    #    #  # # #  #
+  #  # #  # #      #     #   #   # # #
+  ####  ### #     #      #  #     ## #
+  #  # #  # #    #       # #     # # #
+  #  #  ### ##   ####    # #### #  # ##
+
+  # ^^^
 end

@@ -22,10 +22,10 @@ defmodule RoboPaintWorld do
     3b.(implicitly)        change location by moving forward one step
     """
 
-    # XXX not required in this scenario
+    # supervisor trees not required in this scenario
     # use Agent
 
-    # next robot action (to help interpret its non-annotated output values)
+    # next robot action (to help interpret its plain numeric output values)
     @do_paint :paint
     @do_move :turn_and_move
 
@@ -192,12 +192,52 @@ defmodule RoboPaintWorld do
 
     # auxiliary methods to share select constants with enclosing module
     def black, do: @blk
+    def white, do: @wht
     def preexisting, do: @preexisting
     def north, do: @north
     def paint, do: @do_paint
   end
 
   # ^^^
+
+  @doc """
+  # iex> RoboPaintWorld.paint_registration_markings()
+  """
+  @spec paint_registration_markings([integer]) :: {:ok}
+  def paint_registration_markings(firmware) do
+    {:ok, _pid} = WorldAffairs.initialize(
+      [
+        panels: %{{0, 0} => [{WorldAffairs.white(), WorldAffairs.preexisting()}]},
+        location: {0, 0},
+        direction: WorldAffairs.north(),
+        # robot has not yet moved, but may paint immediately
+        next_action: WorldAffairs.paint(),
+        movement_counter: 0
+      ]
+      # |> IO.inspect(label: "\ninit")
+    )
+
+    run_robot(firmware)
+
+    kw = WorldAffairs.get_final_state()
+
+    Keyword.fetch!(kw, :panels)
+    |> Enum.sort(fn {{u, v}, _}, {{x, y}, _} -> 100 * (100 - v) + u <= 100 * (100 - y) + x end)
+    |> Enum.into([], fn {{x,y}, [{colour, _} | _]} -> {{100 + x, 100 + y}, colour} end)
+    |> IO.inspect(label: "\nsorted", limit: :infinity)
+    |> Enum.reduce(
+      {[], {-1,-1}},
+      fn {{x,y}, colour}, {all_pixels, {prev_x, _prev_y}} ->
+        pixel = if colour == WorldAffairs.black(), do: " ", else: "#"
+        maybe_scan_line_terminator = if prev_x + 1 == x, do: "", else: "\n"
+        {[pixel | [maybe_scan_line_terminator | all_pixels]], {x, y}}
+      end
+    )
+    |> Tuple.to_list()
+    |> List.first()
+    |> Enum.join()
+    |> IO.inspect(label: "/bin/echo -e ", limit: :infinity)
+  end
 
   @doc """
   # iex> RoboPaintWorld.count_panels_painted()
