@@ -10,6 +10,96 @@ defmodule Asteroids do
 
   @asteroid "#"
   @space    "."
+  @my_infinity 999_999
+
+  @doc """
+  """
+  @spec enumerate_blasted_asteroids(String.t(), {integer, integer}) :: [{integer, integer}]
+  def enumerate_blasted_asteroids(asteroid_map_s, laser_loc) do
+    {asteroids, map_width, map_height} =
+      asteroid_map_s
+      |> parse_map()
+
+    asteroids
+    |> blast_clockwise(map_width, map_height, laser_loc)
+  end
+
+  @doc """
+  enumerate all asteriods (on map of given size) in order of being hit by laser from given location
+  """
+  @spec blast_clockwise(MapSet.t(), integer, integer, {integer, integer}) :: [{integer, integer}]
+  def blast_clockwise(asteroids, map_width, map_height, {loc_x, loc_y} = _laser_loc) do
+    ordered_angles =
+      calc_clockwise_sweep_angles(map_width, map_height)
+
+    {all_asteroids_hit_in_order, _} =
+      # keep sweeping repeatedly until asteroid map entirely cleared
+      Stream.cycle(ordered_angles)
+      |> Enum.reduce_while(
+        {[], asteroids},
+        fn {step_x, step_y}, {hit_asteroids, remaining_asteroids} ->
+          enumerate_quadrant(remaining_asteroids, map_width, map_height, {loc_x, loc_y}, {step_x, step_y})
+          |> MapSet.to_list()
+          |> case do
+            [] ->
+              # necessarily one asteroid remaining ... hosting laser itself
+              iter_flag = if MapSet.size(remaining_asteroids) > 1, do: :cont, else: :halt
+              {iter_flag, {hit_asteroids, remaining_asteroids}}
+            [{x, y}] ->
+              # for simplicity, tolerate spurious iteration after final hit
+              {:cont, {hit_asteroids ++ [{x,y}], MapSet.delete(remaining_asteroids, {x,y})}}
+          end
+        end
+      )
+
+    all_asteroids_hit_in_order
+  end
+
+  @doc """
+  [-]
+       |
+      d|a
+  (  --o--  )
+      c|b
+       |
+          [+]
+  (a) positive x-coordinate, negative y-coordinate (sic!)
+  (b) positive x-coordinate, positive y-coordinate (sic!)
+  (c) negative x-coordinate, positive y-coordinate (sic!)
+  (d) negative x-coordinate, negative y-coordinate (sic!)
+
+  iex> Asteroids.calc_clockwise_sweep_angles(5, 5)
+  []
+  """
+  @spec calc_clockwise_sweep_angles(integer, integer) :: [{integer, integer}]
+  def calc_clockwise_sweep_angles(map_width, map_height) do
+    # exclude axes, but add them during final concatenation (to prevent duplicates)
+    # [excl_{0,1}...excl_{1,0}]
+    angles_b =
+      for step_x <- Range.new(0, map_width - 1), step_y <- Range.new(0, map_height - 1), Integer.gcd(step_x, step_y) == 1 do
+        {step_x, step_y}
+      end
+      |> Enum.into([])
+      |> Enum.sort_by(fn {x, y} -> if x != 0, do: (y / x), else: @my_infinity end)
+      |> Enum.reject(fn {x, y} -> {x, y} == {1, 0} || {x, y} == {0, 1} end)
+      |> IO.inspect(label: "\n_b", limit: :infinity)
+
+    angles_c =
+      angles_b
+      |> Enum.reverse()
+      |> Enum.map(fn {step_x, step_y} -> {-step_x, step_y} end)
+ 
+    angles_d =
+      angles_b
+      |> Enum.map(fn {step_x, step_y} -> {-step_x, -step_y} end)
+
+    angles_a =
+      angles_b
+      |> Enum.reverse()
+      |> Enum.map(fn {step_x, step_y} -> {step_x, -step_y} end)
+
+    [{0,-1}] ++ angles_a ++ [{1,0}] ++ angles_b ++ [{0,1}] ++ angles_c ++ [{-1,0}] ++ angles_d
+  end
 
   @doc """
   iex> Asteroids.calc_optimum_monitoring_location(~s/
@@ -33,17 +123,6 @@ defmodule Asteroids do
     |> Enum.map(fn candidate_loc -> count_360deg_scan(asteroids, map_width, map_height, candidate_loc) end)
     |> Enum.max_by(fn {{_, _}, count} -> count end)
   end
-
-  # {1,0} <!< must not skip from (3,4) _over_ (2,2) directly to (1,0) at incline (-2,-4) vs (-1,-2)
-  #
-  # {4,0}
-  # {0,2}
-  # {1,2}
-  # {2,2}
-  # {3,2}
-  # {4,2}
-  # {4,3}
-  # {4,4}
 
   @doc """
   iex> Asteroids.count_360deg_scan(MapSet.new([{1,0},{4,0}, {0,2},{1,2},{2,2},{3,2},{4,2}, {4,3}, {3,4},{4,4}]), 5, 5, {3, 4})
