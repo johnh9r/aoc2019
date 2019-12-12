@@ -39,6 +39,6 @@ defmodule JupiterMoonsTest do
       context[:initial_positions],
       context[:initial_velocities],
       context[:num_time_steps]
-    ) == 0
+    ) == 9_876
   end
 end
