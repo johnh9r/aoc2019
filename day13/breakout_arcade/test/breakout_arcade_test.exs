@@ -16,8 +16,8 @@ defmodule BreakoutArcadeTest do
   end
 
   @tag :challenge_pt2
-  @tag :skip
   test "(part2) processed personal challenge correctly", context do
-    assert BreakoutArcade.count_blocks_on_exit_some_more(context[:firmware]) == "(see below)"
+    patched_firmware = [2 | Enum.drop(context[:firmware], 1)]
+    assert BreakoutArcade.calc_highscore_on_completion(patched_firmware) == 0
   end
 end

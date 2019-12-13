@@ -136,7 +136,7 @@ defmodule IntCodeBoost do
         load_param1 = loader_for(param_mode1, rel_base)
         {xs, output_value} = load_param1.(xs, ld_off)
 
-        IO.inspect(output_value, label: "\noutput")
+        # IO.inspect(output_value, label: "\noutput")
 
         output_fun.(output_value)
         _execute(xs, i + insn_sz, rel_base, input_fun, output_fun)
