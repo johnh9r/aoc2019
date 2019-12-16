@@ -18,6 +18,6 @@ defmodule BreakoutArcadeTest do
   @tag :challenge_pt2
   test "(part2) processed personal challenge correctly", context do
     patched_firmware = [2 | Enum.drop(context[:firmware], 1)]
-    assert BreakoutArcade.calc_highscore_on_completion(patched_firmware) == -1
+    assert BreakoutArcade.calc_highscore_on_completion(patched_firmware) == 12_535
   end
 end
