@@ -29,7 +29,6 @@ defmodule FlawedFreqTx do
     |> run_flawed_frequency_processing(iterations, offset)
   end
 
-
   @doc """
   iex> FlawedFreqTx.run_flawed_frequency_processing("12345678", 4)
   "01029498"
@@ -42,8 +41,6 @@ defmodule FlawedFreqTx do
 
   iex> FlawedFreqTx.run_flawed_frequency_processing("69317163492948606335995924319873", 100)
   "52432133" 
-
-
   """
   @spec run_flawed_frequency_processing(String.t(), integer, integer) :: String.t()
   def run_flawed_frequency_processing(message, iterations, offset \\ 0)
@@ -54,12 +51,11 @@ defmodule FlawedFreqTx do
   end
 
   def run_flawed_frequency_processing(message, iterations, offset) do
+    # IO.inspect(iterations, label: "\niter")
+
     message_digits =
       message
       |> String.split(~r//, trim: true)
-      |> Enum.map(&String.to_integer/1)
-
-    # IO.inspect({message_digits, iterations}, label: "\n")
 
     phase_output_message =
       message_digits
@@ -84,7 +80,9 @@ defmodule FlawedFreqTx do
           # |> IO.inspect(label: "\nzip(#{i})")
           |> Enum.reduce(
             0,
-            fn {d, p}, acc -> acc + d * p end
+            fn {d, p}, acc ->
+              acc + least_significant_digit_mult(d, p)
+            end
           )
           # only the ones digit is kept
           |> Kernel.abs()
@@ -95,5 +93,47 @@ defmodule FlawedFreqTx do
 
     # This new list is also used as the input for the next phase.
     run_flawed_frequency_processing(phase_output_message, iterations - 1, offset)
+  end
+
+  #
+  # custom arithmetic to avoid expensive arbitrary-precision of standard library
+  #
+
+  # calculate only least-significant digit of multiplication result (by lookup)
+  @spec least_significant_digit_mult(String.t(), integer) :: integer
+  defp least_significant_digit_mult(digit_s, sign) do
+    case sign do
+      0 -> 0
+      1 ->
+        case digit_s do
+          "0" -> 0
+          "1" -> 1
+          "2" -> 2
+          "3" -> 3
+          "4" -> 4
+          "5" -> 5
+          "6" -> 6
+          "7" -> 7
+          "8" -> 8
+          "9" -> 9
+            c -> raise "unsupported digit in input message (#{c})"
+        end
+     -1 ->
+        case digit_s do
+          "0" ->  0
+          "1" -> -1
+          "2" -> -2
+          "3" -> -3
+          "4" -> -4
+          "5" -> -5
+          "6" -> -6
+          "7" -> -7
+          "8" -> -8
+          "9" -> -9
+            c -> raise "unsupported digit in input message (#{c})"
+        end
+      n -> raise "unsupported factor in pattern (#{n})"
+
+    end
   end
 end
