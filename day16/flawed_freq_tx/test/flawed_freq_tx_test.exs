@@ -14,9 +14,19 @@ defmodule FlawedFreqTxTest do
   @tag :challenge_pt1
   test "(part 1) correctly processes personal challenge data", context do
     result =
-      FlawedFreqTx.run_flawed_frequency_processing(context[:message], context[:iterations])
-      |> String.slice(0,8)
+      context[:message]
+      |> FlawedFreqTx.run_flawed_frequency_processing(context[:iterations])
 
     assert result == "30550349"
+  end
+
+  @tag :challenge_pt2
+  # XXX brute force
+  test "(part 2) correctly processes personal challenge data", context do
+    result =
+      context[:message]
+      |> FlawedFreqTx.run_extra_long_flawed_frequency_processing(context[:iterations])
+
+    assert result == "00000000"
   end
 end

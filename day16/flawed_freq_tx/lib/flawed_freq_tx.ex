@@ -6,26 +6,54 @@ defmodule FlawedFreqTx do
   @base_pattern [0, 1, 0, -1]
 
   @doc """
+  iex> FlawedFreqTx.run_extra_long_flawed_frequency_processing("03036732577212944063491565474664", 100)
+  "84462026"
+
+  iex> FlawedFreqTx.run_extra_long_flawed_frequency_processing("02935109699940807407585447034323", 100)
+  "78725270"
+
+  iex> FlawedFreqTx.run_extra_long_flawed_frequency_processing("03081770884921959731165446850517", 100)
+  "53553731"
+  """
+  @spec run_extra_long_flawed_frequency_processing(String.t(), integer) :: String.t()
+  def run_extra_long_flawed_frequency_processing(message, iterations) do
+    offset =
+      message
+      |> String.slice(0,7)
+      |> String.to_integer()
+
+    [message]
+    |> Stream.cycle()
+    |> Stream.take(10_000)
+    |> Enum.join("")
+    |> run_flawed_frequency_processing(iterations, offset)
+  end
+
+
+  @doc """
   iex> FlawedFreqTx.run_flawed_frequency_processing("12345678", 4)
-  ...> |> String.slice(0, 8)
   "01029498"
 
   iex> FlawedFreqTx.run_flawed_frequency_processing("80871224585914546619083218645595", 100)
-  ...> |> String.slice(0, 8)
   "24176176"
 
   iex> FlawedFreqTx.run_flawed_frequency_processing("19617804207202209144916044189917", 100)
-  ...> |> String.slice(0, 8)
   "73745418"
 
   iex> FlawedFreqTx.run_flawed_frequency_processing("69317163492948606335995924319873", 100)
-  ...> |> String.slice(0, 8)
   "52432133" 
-  """
-  @spec run_flawed_frequency_processing(String.t(), integer) :: String.t()
-  def run_flawed_frequency_processing(message, iterations) when iterations <= 0, do: message
 
-  def run_flawed_frequency_processing(message, iterations) do
+
+  """
+  @spec run_flawed_frequency_processing(String.t(), integer, integer) :: String.t()
+  def run_flawed_frequency_processing(message, iterations, offset \\ 0)
+
+  def run_flawed_frequency_processing(message, iterations, offset) when iterations <= 0 do
+    message
+    |> String.slice(offset, 8)
+  end
+
+  def run_flawed_frequency_processing(message, iterations, offset) do
     message_digits =
       message
       |> String.split(~r//, trim: true)
@@ -66,6 +94,6 @@ defmodule FlawedFreqTx do
       |> Enum.join("")
 
     # This new list is also used as the input for the next phase.
-    run_flawed_frequency_processing(phase_output_message, iterations - 1)
+    run_flawed_frequency_processing(phase_output_message, iterations - 1, offset)
   end
 end
