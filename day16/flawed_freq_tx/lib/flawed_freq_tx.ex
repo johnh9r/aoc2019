@@ -6,21 +6,20 @@ defmodule FlawedFreqTx do
   @base_pattern [0, 1, 0, -1]
 
   @doc """
-  iex> FlawedFreqTx.run_flawed_frequency_processing("12345678", 8)
+  iex> FlawedFreqTx.run_flawed_frequency_processing("12345678", 4)
+  ...> |> String.slice(0, 8)
   "01029498"
 
-
-      80871224585914546619083218645595 becomes 24176176.
-      19617804207202209144916044189917 becomes 73745418.
-      69317163492948606335995924319873 becomes 52432133.
-
   iex> FlawedFreqTx.run_flawed_frequency_processing("80871224585914546619083218645595", 100)
+  ...> |> String.slice(0, 8)
   "24176176"
 
   iex> FlawedFreqTx.run_flawed_frequency_processing("19617804207202209144916044189917", 100)
+  ...> |> String.slice(0, 8)
   "73745418"
 
   iex> FlawedFreqTx.run_flawed_frequency_processing("69317163492948606335995924319873", 100)
+  ...> |> String.slice(0, 8)
   "52432133" 
   """
   @spec run_flawed_frequency_processing(String.t(), integer) :: String.t()
@@ -32,7 +31,7 @@ defmodule FlawedFreqTx do
       |> String.split(~r//, trim: true)
       |> Enum.map(&String.to_integer/1)
 
-    IO.inspect({message_digits, iterations}, label: "\n")
+    # IO.inspect({message_digits, iterations}, label: "\n")
 
     phase_output_message =
       message_digits
@@ -50,15 +49,11 @@ defmodule FlawedFreqTx do
 
             # When applying the pattern, skip the very first value exactly once.
 
-          # ARGH -- impl of Enum.drop/1 cannot cope w/ infinite lists
-          # [_ | repeating_pattern_shift_left_one] = repeating_pattern
-          repeating_pattern_shift_left_one = repeating_pattern
-
           # each element in the output array uses all of the same input array elements;
           # element in the new list is built by multiplying every value in the input list
           # by a value in a repeating pattern and then adding up the results
-          Stream.zip(message_digits, repeating_pattern_shift_left_one)
-          |> IO.inspect(label: "\nzip(#{i})")
+          Stream.zip(message_digits, repeating_pattern)
+          # |> IO.inspect(label: "\nzip(#{i})")
           |> Enum.reduce(
             0,
             fn {d, p}, acc -> acc + d * p end

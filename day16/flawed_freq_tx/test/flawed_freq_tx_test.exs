@@ -12,7 +12,11 @@ defmodule FlawedFreqTxTest do
   end
 
   @tag :challenge_pt1
-  test "(part 1) correctly processed personal challenge data", context do
-    assert FlawedFreqTx.run_flawed_frequency_processing(context[:message], context[:iterations]) == "01234567"
+  test "(part 1) correctly processes personal challenge data", context do
+    result =
+      FlawedFreqTx.run_flawed_frequency_processing(context[:message], context[:iterations])
+      |> String.slice(0,8)
+
+    assert result == "30550349"
   end
 end
