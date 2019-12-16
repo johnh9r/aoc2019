@@ -48,13 +48,12 @@ defmodule BreakoutArcade.WorldAffairs do
   def handle_input_request() do
     # restore context to answer question
     kw = Agent.get(__MODULE__, fn state -> state end)
-    # tiles =
-    #   Keyword.fetch!(kw, :tiles)
-    #   |> render_screen()
-    #   |> (fn screen -> ["\n\n" | screen] end).()
-    #   |> IO.write()
 
-    [joy_move | remaining_joy_moves] = Keyword.fetch!(kw, :joy_moves)
+    {joy_move, remaining_joy_moves} =
+      case Keyword.fetch!(kw, :joy_moves) do
+        [] -> {@joy_neutral, []}
+        [joy_head | joy_tail] -> {joy_head, joy_tail}
+      end
 
     Agent.update(
       __MODULE__,
@@ -62,6 +61,40 @@ defmodule BreakoutArcade.WorldAffairs do
     )
 
     joy_move
+    |> IO.inspect(label: "\njoyin")
+  end
+
+  @def """
+  """
+  @spec operate_joystick({}, {}) :: integer
+  def operate_joystick({_x_ball, y_ball}, {_x_ball_prev, y_ball_prev}) when y_ball <= y_ball_prev do
+    # ball moving away from paddle:  no-op, just wait for direction of rebound
+    @joy_neutral
+  end
+
+  def operate_joystick(state, {x_ball, y_ball}, {x_ball_prev, y_ball_prev}) do
+    # TODO record paddle position explicitly in game state
+    # ball travelling back towards paddle
+    [{{x_paddle, y_paddle}, _}] =
+      Keyword.fetch!(state, :tiles)
+      |> Enum.filter(fn {_k, v} -> v == @paddle end)
+
+    IO.inspect({x_ball_prev, y_ball_prev}, label: "\ndbg(prev)")
+    IO.inspect({x_ball, y_ball}, label: "\ndbg(curr)")
+    IO.inspect({x_paddle, y_paddle}, label: "\ndbg(paddle)")
+
+    # calc interception point with paddle scanline
+    # always: y_ball < y_paddle (or else it is too late)
+    x_target =
+      x_ball + (x_ball - x_ball_prev) * (y_paddle - y_ball)
+
+    # calc horiz diff and move joystick accordingly (if at all)
+    next_joy_move =
+      case x_target - x_paddle do
+        n when n == 0 -> @joy_neutral
+        n when n < 0 -> @joy_left  # Stream.cycle([@joy_left]) |> Enum.take(abs(n))
+        n when n > 0 -> @joy_right  # Stream.cycle([@joy_right]) |> Enum.take(n)
+      end
   end
 
   @doc """
@@ -90,7 +123,8 @@ defmodule BreakoutArcade.WorldAffairs do
                 Keyword.merge(state, [next_action: @do_score_noop])
 
               _ ->
-                Keyword.merge(state, [buffer: [value], next_action: @do_coord_y, ]) end
+                Keyword.merge(state, [buffer: [value], next_action: @do_coord_y, ])
+            end
           end
         )
 
@@ -101,7 +135,9 @@ defmodule BreakoutArcade.WorldAffairs do
             buffer = Keyword.fetch!(state, :buffer)
             # sanity check
             1 = length(buffer)
-            Keyword.merge(state, [buffer: buffer ++ [value], next_action: @do_paint]) end)
+            Keyword.merge(state, [buffer: buffer ++ [value], next_action: @do_paint])
+          end
+        )
 
       @do_paint ->
         Agent.update(
@@ -109,16 +145,37 @@ defmodule BreakoutArcade.WorldAffairs do
           fn state ->
             tiles = Keyword.fetch!(state, :tiles)
             [x, y] = Keyword.fetch!(state, :buffer)
+            playing = Keyword.fetch!(state, :score) > 0
 
             # overwrite (w/o maintaining history)
             new_tiles = Map.put(tiles, {x, y}, value)
 
             new_tiles
             |> render_screen()
-            |> (fn screen -> if true || Keyword.fetch!(state, :score) != 0, do: ["\n\n" | screen], else: "" end).()
+            |> (fn screen -> if playing, do: ["\n\n" | screen], else: [""] end).()
             |> IO.write()
 
-            Keyword.merge(state, [tiles: new_tiles, buffer: [], next_action: @do_coord_x]) end)
+            case value do
+              @ball ->
+                # also inject joystick movement (only starting on first rebound from smashed brick)
+                ball_prev = Keyword.fetch!(state, :ball_curr)
+                next_joy = if playing, do: operate_joystick(state, {x,y}, ball_prev), else: @joy_neutral
+                Keyword.merge(
+                  state, [
+                    tiles: new_tiles,
+                    ball_curr: {x,y},
+                    ball_prev: ball_prev,
+                    buffer: [],
+                    joy_moves: [next_joy],
+                    next_action: @do_coord_x
+                  ]
+                )
+
+              _ ->
+                Keyword.merge(state, [tiles: new_tiles, buffer: [], next_action: @do_coord_x])
+            end
+          end
+        )
 
       @do_score_noop ->
         Agent.update(
@@ -127,11 +184,13 @@ defmodule BreakoutArcade.WorldAffairs do
         )
 
       @do_score_value ->
+        IO.inspect(value, label: "\nscore")
         Agent.update(
           __MODULE__,
-          fn state -> Keyword.merge(state, [score: value, next_action: @do_coord_x]) end
+          fn state ->
+            Keyword.merge(state, [score: value, next_action: @do_coord_x])
+          end
         )
-        IO.inspect(value, label: "\nscore")
     end
     :ok
   end
@@ -145,8 +204,8 @@ defmodule BreakoutArcade.WorldAffairs do
       [],
       fn {_group_key_y, tiles} ->
         tiles
-        |> Enum.sort_by(fn {{x, y},_} -> x end)
-        |> Enum.map(fn {{x,y}, tile_id} -> tile_id end)
+        |> Enum.sort_by(fn {{x, _y},_} -> x end)
+        |> Enum.map(fn {{_x,_y}, tile_id} -> tile_id end)
       end
     )
     |> Enum.map(
@@ -197,7 +256,7 @@ defmodule BreakoutArcade do
   """
 
   alias BreakoutArcade.WorldAffairs
-  import BreakoutArcade.WorldAffairs, only: [jl: 0, j_: 0, jr: 0]
+  # import BreakoutArcade.WorldAffairs, only: [jl: 0, j_: 0, jr: 0]
 
   @doc """
   part 2
@@ -207,9 +266,13 @@ defmodule BreakoutArcade do
     {:ok, _pid} = WorldAffairs.initialize(
       [
         tiles: %{},
+        ball_curr: {-1, -1},
+        ball_prev: {-1, -1},
         buffer: [],
         score: 0,
-        joy_moves: [jl, jl, jl, j_, j_, j_],
+        # dynamically populated by AutoPlayer _after_ initial scoring event;
+        # initial state has ball heading straight towards paddle, so just hold still
+        joy_moves: [],  #[j_, j_, j_, j_, j_, j_],
         next_action: WorldAffairs.coord_x()
       ]
     )
@@ -246,7 +309,7 @@ defmodule BreakoutArcade do
   defp count_blocks(tiles) do
     tiles
     |> Map.to_list()
-    |> Enum.filter(fn {{x, y}, tile_id} -> tile_id == WorldAffairs.block() end)
+    |> Enum.filter(fn {{_x, _y}, tile_id} -> tile_id == WorldAffairs.block() end)
     |> Kernel.length()
   end
 
