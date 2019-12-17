@@ -124,17 +124,27 @@ defmodule OxygenSupply.WorldAffairs do
 
   @spec render_patchy_map(tiles_t) :: iodata
   defp render_patchy_map(tiles) do
-    {{max_x, y}, {_, _}} =
+    {
+      {{min_x, _this_y}, {_, _}},
+      {{max_x, _that_y}, {_, _}}
+    }  =
       tiles
-      |> Enum.max_by(fn {{x,y}, {_, _}} -> {x,y} end)
+      |> Enum.min_max_by(fn {{x,_y}, {_, _}} -> x end)
 
-    background =
-      # XXX as yet unknown tiles (on RHS) are naturally blank for shorter scanlines
-      0..max_x
-      |> Enum.map(fn x -> {{x, y}, {@unknown, nil}} end)
+    {
+      {{_this_x, min_y}, {_, _}},
+      {{_that_x, max_y}, {_, _}}
+    }  =
+      tiles
+      |> Enum.min_max_by(fn {{_x,y}, {_, _}} -> y end)
+
+    rectangular_background =
+      for y <- min_y..max_y, x <- min_x..max_x do
+        {{x, y}, {@unknown, nil}}
+      end
       |> Enum.into(%{})
 
-    background
+    rectangular_background
     |> Map.merge(tiles)
     # use y-coordinate as dominant sort key in order to form scan lines
     |> Enum.group_by(fn {{_x, y}, _tile_id} -> y end)
@@ -146,17 +156,6 @@ defmodule OxygenSupply.WorldAffairs do
         |> Enum.map(fn {{_x,_y}, {tile_ch, _}} -> tile_ch end)
       end
     )
-    # |> IO.inspect(label: "\nrpm")
-    # |> Enum.map(
-    #   fn tiles_in_scan_line ->
-    #     tiles_in_scan_line
-    #     |> Enum.reduce(
-    #       [],
-    #       fn tile_id, acc -> [tile_ch | acc] end
-    #     )
-    #   end
-    # )
-    |> Enum.map(&Enum.reverse/1)
     |> Enum.intersperse("\n")
   end
 
