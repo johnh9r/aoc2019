@@ -137,6 +137,33 @@ defmodule OxygenSupply.WorldAffairs do
     )
   end
 
+  @spec spread_oxygen(WorldAffairs.tiles_t, [{integer, integer}], integer) :: integer
+  # time has already been incremented once too often when full oxygen supply is detected
+  def spread_oxygen(tiles, edge_coords, time) when map_size(tiles) == 0, do: time - 1
+
+  # XXX Tuple.elem(n)
+  def spread_oxygen(tiles, edge_coords, time) do
+    {remaining_tiles, new_edge_coords} =
+      edge_coords
+      |> Enum.reduce(
+        {tiles, []},
+        fn {x,y}, {ts, coords} ->
+          new_coords =
+            [@move_north, @move_south, @move_west, @move_east]
+            |> Enum.map(fn dir -> target_tile(tiles, x, y, dir) end)
+            |> Enum.reject(fn {{_x,_y}, {tile,_}} -> tile == nil end)
+            |> Enum.map(fn {{x,y}, {_,_}} -> {x,y} end)
+
+          {
+            Map.delete(ts, {x,y}),
+            coords ++ new_coords
+          }
+        end
+      )
+
+    spread_oxygen(remaining_tiles, new_edge_coords, time + 1)
+  end
+
   @spec target_tile(tiles_t, integer, integer, integer) :: {{integer, integer}, {String.t(), integer}}
   def target_tile(tiles, x, y, move) do
     {target_x, target_y} =
@@ -154,7 +181,7 @@ defmodule OxygenSupply.WorldAffairs do
   end
 
   @spec render_patchy_map(tiles_t) :: iodata
-  defp render_patchy_map(tiles) do
+  def  render_patchy_map(tiles) do
     {
       {{min_x, _this_y}, {_, _}},
       {{max_x, _that_y}, {_, _}}
@@ -205,12 +232,57 @@ defmodule OxygenSupply do
 
   ## notes
   * coordinate system w/ (x, y) = (0, 0) = starting position
-      * coordinates growing negative/positive on both axes
+  * coordinates growing negative/positive on both axes
   """
 
   alias OxygenSupply.WorldAffairs
 
   @doc """
+  part 2
+  """
+  @spec calc_timesteps_to_ubiquitous_oxygen_supply(String.t()) :: integer
+  def calc_timesteps_to_ubiquitous_oxygen_supply(map_s) do
+    tiles =
+      map_s
+      |> parse()
+      # |> WorldAffairs.render_patchy_map() |> IO.write()
+
+    [{{x_oxygen_supply, y_oxygen_supply}, {_, _}}] =
+      tiles
+      |> Enum.filter(fn {{_x,_y}, {tile,_}} -> tile == WorldAffairs.oxygen_supply() end)
+      |> IO.inspect(label: "\nsupply")
+
+    tiles
+    |> Enum.reject(fn {{_x,_y}, {tile,_}} -> tile != WorldAffairs.surface() end)
+    |> Enum.into(%{})
+    # |> WorldAffairs.render_patchy_map() |> IO.write()
+    |> WorldAffairs.spread_oxygen([{x_oxygen_supply, y_oxygen_supply}], 0)
+  end
+
+  @spec parse(String.t()) :: WorldAffairs.tiles_t
+  defp parse(map) do
+    map
+    |> String.trim()
+    |> String.split(~r/\n/, trim: true)
+    |> Enum.reduce(
+      {%{}, 0},
+      fn ts, {tiles, y} = _acc ->
+        ts
+        |> String.split(~r//, trim: true)
+        |> Enum.with_index()
+        |> Enum.map(
+          fn {t, x} -> {{x,y}, {t, nil}} end
+        )
+        |> Enum.into(tiles)
+        |> (fn tss -> {tss, y+1} end).()
+      end
+    )
+    |> (fn {tiles, _} -> tiles end).()
+  end
+
+
+  @doc """
+  part 1
   """
   @spec calc_min_steps_to_oxygen_supply([integer]) :: integer
   def calc_min_steps_to_oxygen_supply(firmware) do
@@ -229,7 +301,7 @@ defmodule OxygenSupply do
 
     state = WorldAffairs.get_final_state()
     Keyword.fetch!(state, :tiles)
-    |> Enum.filter(fn {{_x, _y}, {tile, _dist}} = i -> tile == WorldAffairs.oxygen_supply() end)
+    |> Enum.filter(fn {{_x, _y}, {tile, _dist}} -> tile == WorldAffairs.oxygen_supply() end)
     |> (fn [{{_x,_y}, {_, dist}}] -> dist end).()
   end
 
