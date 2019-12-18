@@ -7,6 +7,9 @@ defmodule OxygenSupply.WorldAffairs do
   @wall "#"
   @surface "."
   @oxygen_supply "*"
+
+  # highlight {0,0} for map interpretation
+  @origin "_"
   @unknown " "
 
   @move_north 1
@@ -90,6 +93,9 @@ defmodule OxygenSupply.WorldAffairs do
                   {@surface, _} ->
                     # already known as surface with same or shorter distance
                     tiles
+                  {@origin, _} ->
+                    # surface with well-known distance zero
+                    tiles
                   _ -> raise "unexpected state of map tiles"
                 end
               [tiles: new_tiles, x: target_x, y: target_y, last_move: nil]
@@ -150,6 +156,8 @@ defmodule OxygenSupply.WorldAffairs do
       tiles
       |> Enum.min_max_by(fn {{_x,y}, {_, _}} -> y end)
 
+    # IO.inspect({{min_x, min_y},{max_x, max_y}}, label: "\nmin/max")
+
     rectangular_background =
       for y <- min_y..max_y, x <- min_x..max_x do
         {{x, y}, {@unknown, nil}}
@@ -159,12 +167,13 @@ defmodule OxygenSupply.WorldAffairs do
     rectangular_background
     |> Map.merge(tiles)
     # use y-coordinate as dominant sort key in order to form scan lines
-    |> Enum.group_by(fn {{_x, y}, _tile_id} -> y end)
+    |> Enum.group_by(fn {{_x, y}, {_, _}} -> y end)
+    |> Enum.sort_by(fn {k, _v}-> -k end)
     |> Enum.into(
       [],
-      fn {_group_key_y, tiles} ->
+      fn {group_key_y, tiles} ->
         tiles
-        |> Enum.sort_by(fn {{x, _y},_} -> x end)
+        |> Enum.sort_by(fn {{x, _y}, {_, _}} -> x end)
         |> Enum.map(fn {{_x,_y}, {tile_ch, _}} -> tile_ch end)
       end
     )
@@ -172,6 +181,7 @@ defmodule OxygenSupply.WorldAffairs do
   end
 
   # auxiliary functions to share constants
+  def origin, do: @origin
   def surface, do: @surface
   def oxygen_supply, do: @oxygen_supply
 end
@@ -194,7 +204,7 @@ defmodule OxygenSupply do
     {:ok, _pid} = WorldAffairs.initialize(
       tiles: %{
         # starting (by def) at pos {0,0}, which cannot be wall and is zero steps away
-        {0,0} => {WorldAffairs.surface, 0}
+        {0,0} => {WorldAffairs.origin(), 0}
       },
       x: 0,
       y: 0,
