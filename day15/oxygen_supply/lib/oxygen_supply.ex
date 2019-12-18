@@ -14,6 +14,9 @@ defmodule OxygenSupply.WorldAffairs do
   @move_west 3
   @move_east 4
 
+  # invalid command forces termination of robot processing loop
+  @power_down 0
+
   @status_blocked 0
   @status_moved 1
   @status_found 2
@@ -34,16 +37,23 @@ defmodule OxygenSupply.WorldAffairs do
   @spec handle_input_request() :: {integer}
   def handle_input_request() do
     # TODO consider only smart moves based on known environment (if any) on map
-    _state = Agent.get(__MODULE__, fn state -> state end)
+    state = Agent.get(__MODULE__, fn state -> state end)
+    tiles = Keyword.fetch!(state, :tiles)
+
     possible_moves = [@move_north, @move_south, @move_west, @move_east]
     chosen_move =
       Enum.random(possible_moves)
       |> IO.inspect(label: "\nheading")
 
+    # XXX
+    # success = (chosen_move |> IO.inspect() == Keyword.fetch!(state, :last_move) |> IO.inspect())
+
     # XXX closure over last_move
     Agent.update(__MODULE__, fn state -> Keyword.merge(state, [last_move: chosen_move]) end)
 
-    chosen_move
+    # indication from output handler
+    success = Keyword.fetch!(state, :success)
+    if success, do: @power_down, else: chosen_move
   end
 
   @spec handle_output_request(integer) :: :ok
@@ -67,6 +77,7 @@ defmodule OxygenSupply.WorldAffairs do
               # don't move
               new_tiles = Map.put(tiles, {target_x, target_y}, {@wall, nil})
               [tiles: new_tiles, last_move: nil]
+              # [tiles: new_tiles]
 
             @status_moved ->
               IO.inspect({{target_x, target_y}, {target_tile, best_known_target_dist}}, label: "\nmoved")
@@ -82,6 +93,7 @@ defmodule OxygenSupply.WorldAffairs do
                   _ -> raise "unexpected state of map tiles"
                 end
               [tiles: new_tiles, x: target_x, y: target_y, last_move: nil]
+              # [tiles: new_tiles, x: target_x, y: target_y]
 
             @status_found ->
               IO.inspect({{target_x, target_y}, {target_tile, best_known_target_dist}}, label: "\nfound")
@@ -90,10 +102,10 @@ defmodule OxygenSupply.WorldAffairs do
               new_tiles =
                 Map.put(tiles, {target_x, target_y}, {@oxygen_supply, curr_dist + 1})
 
-              # TODO terminate IntCode process cleanly
               IO.inspect("\nfound oxygen supply at {#{target_x}, #{target_y}} in #{curr_dist + 1} steps")
-              # TODO  render map (cf Day 13)
-              [tiles: new_tiles, x: target_x, y: target_y, last_move: nil]
+
+              [tiles: new_tiles, x: target_x, y: target_y, last_move: nil, success: true]
+              # [tiles: new_tiles, x: target_x, y: target_y, success: true]
           end
 
           Keyword.fetch!(update, :tiles)
@@ -161,6 +173,7 @@ defmodule OxygenSupply.WorldAffairs do
 
   # auxiliary functions to share constants
   def surface, do: @surface
+  def oxygen_supply, do: @oxygen_supply
 end
 
 defmodule OxygenSupply do
@@ -185,14 +198,16 @@ defmodule OxygenSupply do
       },
       x: 0,
       y: 0,
-      last_move: nil
+      last_move: nil,
+      success: false
     )
 
     run_robot(firmware)
 
     state = WorldAffairs.get_final_state()
     Keyword.fetch!(state, :tiles)
-
+    |> Enum.filter(fn {{_x, _y}, {tile, _dist}} = i -> tile == WorldAffairs.oxygen_supply() end)
+    |> (fn [{{_x,_y}, {_, dist}}] -> dist end).()
   end
 
   @spec run_robot([integer]) :: :ok
