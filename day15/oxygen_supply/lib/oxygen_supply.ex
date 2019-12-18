@@ -36,7 +36,7 @@ defmodule OxygenSupply.WorldAffairs do
     Agent.get(__MODULE__, fn state -> state end)
   end
 
-  # XXX random walk?
+  # XXX random walk with curiosity bias
   @spec handle_input_request() :: {integer}
   def handle_input_request() do
     # TODO consider only smart moves based on known environment (if any) on map
@@ -47,22 +47,22 @@ defmodule OxygenSupply.WorldAffairs do
 
     possible_moves =
       [@move_north, @move_south, @move_west, @move_east]
-      |> Enum.map(fn dir -> {dir, target_tile(tiles, x, y, dir)} end)
-      |> Enum.reduce(
-        [],
-        fn 
-            {{_x,_y}, {@wall, _}} -> acc
-            _ -> [dir | acc]
-          end
-        end
-      )
+      |> Enum.map(fn dir -> {{_x,_y}, {tile_ch, _}} = target_tile(tiles, x, y, dir); {dir, tile_ch} end)
+      |> Enum.reject(fn {_dir, tile_ch} -> tile_ch == @wall end)
 
-    chosen_move =
-      Enum.random(possible_moves)
+    interesting_moves =
+      possible_moves
+      |> Enum.filter(fn {_dir, tile_ch} -> tile_ch != @surface && tile_ch != @origin end)
+
+    candidate_moves =
+      case interesting_moves do
+        [] -> possible_moves
+        _ -> interesting_moves
+      end
+
+    {chosen_move, _} =
+      Enum.random(candidate_moves)
       |> IO.inspect(label: "\nheading")
-
-    # XXX
-    # success = (chosen_move |> IO.inspect() == Keyword.fetch!(state, :last_move) |> IO.inspect())
 
     # XXX closure over last_move
     Agent.update(__MODULE__, fn state -> Keyword.merge(state, [last_move: chosen_move]) end)

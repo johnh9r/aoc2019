@@ -12,6 +12,6 @@ defmodule OxygenSupplyTest do
 
   @tag :challenge_pt1
   test "(part 1) correctly processes personal challenge", context do
-    assert OxygenSupply.calc_min_steps_to_oxygen_supply(context[:firmware]) == -1
+    assert OxygenSupply.calc_min_steps_to_oxygen_supply(context[:firmware]) == 404
   end
 end
