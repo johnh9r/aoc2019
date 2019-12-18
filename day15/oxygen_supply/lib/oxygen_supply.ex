@@ -42,8 +42,21 @@ defmodule OxygenSupply.WorldAffairs do
     # TODO consider only smart moves based on known environment (if any) on map
     state = Agent.get(__MODULE__, fn state -> state end)
     tiles = Keyword.fetch!(state, :tiles)
+    x = Keyword.fetch!(state, :x)
+    y = Keyword.fetch!(state, :y)
 
-    possible_moves = [@move_north, @move_south, @move_west, @move_east]
+    possible_moves =
+      [@move_north, @move_south, @move_west, @move_east]
+      |> Enum.map(fn dir -> {dir, target_tile(tiles, x, y, dir)} end)
+      |> Enum.reduce(
+        [],
+        fn 
+            {{_x,_y}, {@wall, _}} -> acc
+            _ -> [dir | acc]
+          end
+        end
+      )
+
     chosen_move =
       Enum.random(possible_moves)
       |> IO.inspect(label: "\nheading")
@@ -171,7 +184,7 @@ defmodule OxygenSupply.WorldAffairs do
     |> Enum.sort_by(fn {k, _v}-> -k end)
     |> Enum.into(
       [],
-      fn {group_key_y, tiles} ->
+      fn {_group_key_y, tiles} ->
         tiles
         |> Enum.sort_by(fn {{x, _y}, {_, _}} -> x end)
         |> Enum.map(fn {{_x,_y}, {tile_ch, _}} -> tile_ch end)
