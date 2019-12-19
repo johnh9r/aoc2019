@@ -12,6 +12,6 @@ defmodule TractorBeamTest do
 
   @tag :challenge_pt1
   test "(part 1) correctly processed personal challenge input", context do
-    assert TractorBeam.count_affected_positions(context[:firmware]) == -1
+    assert TractorBeam.count_affected_positions(context[:firmware]) == 152
   end
 end

@@ -2,10 +2,6 @@ defmodule TractorBeam.WorldAffairs do
   @moduledoc """
   """
 
-  # from problem definition
-  @x_max 49
-  @y_max 49
-
   @spec initialize(Keyword.t()) :: pid
   def initialize(initial_state) do
     Agent.start_link(fn -> initial_state end, name: __MODULE__)
@@ -16,58 +12,24 @@ defmodule TractorBeam.WorldAffairs do
     Agent.get(__MODULE__, fn state -> state end)
   end
 
-  @spec handle_input_request() :: {integer}
+  @spec handle_input_request() :: integer
   def handle_input_request() do
     state = Agent.get(__MODULE__, fn state -> state end)
-    scan_complete = Keyword.fetch!(state, :scan_complete)
-    next = Keyword.fetch!(state, :next)
-    x = Keyword.fetch!(state, :x)
-    y = Keyword.fetch!(state, :y)
-
-    case {scan_complete, next} do
-      {true, _} ->
-        # "Negative numbers are invalid and will confuse the drone; all numbers should be zero or positive."
-        -1
-      {_, :x_axis} ->
-        Agent.update(__MODULE__, fn state -> Keyword.merge(state, [next: :y_axis]) end)
-        x
-      {_, :y_axis} ->
-        Agent.update(__MODULE__, fn state -> Keyword.merge(state, [next: :y_axis]) end)
-        y
-    end
+    [next_coord | remaining_coords] = Keyword.fetch!(state, :xy)
+    Agent.update(__MODULE__, fn state -> Keyword.merge(state, [xy: remaining_coords]) end)
+    next_coord
   end
 
   @spec handle_output_request(integer) :: :ok
   def handle_output_request(value) do
-    Agent.update(
-      __MODULE__,
-      fn state ->
-        tiles = Keyword.fetch!(state, :tiles)
-        x = Keyword.fetch!(state, :x)
-        y = Keyword.fetch!(state, :y)
-
-        new_tiles =
-          case value do
-            1 -> MapSet.put(tiles, {x,y})
-            _ -> tiles
-          end
-
-        {x_next, y_next} =
-          case x < @x_max do
-            true -> {x + 1, y}
-            _ -> {0, y + 1}
-          end
-
-        changed_state =
-          case y_next < @y_max do
-            true -> [tiles: new_tiles, x: x_next, y: y_next]
-            _ -> [tiles: new_tiles, x: x_next, y: y_next, scan_complete: true] 
-          end
-
-        Keyword.merge(state, changed_state)
-      end
-    )
+    Agent.update(__MODULE__, fn state -> Keyword.merge(state, [affected: value]) end)
   end
+
+  @spec set_drone_coordinates(integer, integer) :: :ok
+  def set_drone_coordinates(x, y) do
+    Agent.update(__MODULE__, fn state -> Keyword.merge(state, [xy: [x, y], affected: false]) end)
+  end
+
 end
 
 
@@ -78,6 +40,10 @@ defmodule TractorBeam do
   """
 
   alias TractorBeam.WorldAffairs
+
+  # from problem definition
+  @x_max 49
+  @y_max 49
 
   @doc """
   TractorBeam.count_affected_positions(unavailable_firmware)
@@ -95,23 +61,32 @@ defmodule TractorBeam do
   """
   @spec count_affected_positions([integer]) :: integer
   def count_affected_positions(firmware) do
-    {:ok, _pid} = WorldAffairs.initialize(
-      tiles: MapSet.new(),
-      next: :x_axis,
-      x: 0,
-      y: 0,
-      scan_complete: false
+    {:ok, _pid} = WorldAffairs.initialize([])
+
+    0..@y_max
+    |> Enum.reduce(
+      MapSet.new(),
+      fn y, outer_acc ->
+        0..@x_max
+        |> Enum.reduce(
+          outer_acc,
+          fn x, inner_acc ->
+            WorldAffairs.set_drone_coordinates(x, y)
+            run_single_use_drone(firmware)
+            state = WorldAffairs.get_final_state()
+            case Keyword.fetch!(state, :affected) do
+              1 -> MapSet.put(inner_acc, {x,y})
+              _ -> inner_acc
+            end
+          end
+        )
+      end
     )
-
-    run_drone(firmware)
-
-    state = WorldAffairs.get_final_state()
-    Keyword.fetch!(state, :tiles)
-    |> Kernel.map_size()
+    |> MapSet.size()
   end
 
-  @spec run_drone([integer]) :: :ok
-  defp run_drone(firmware) do
+  @spec run_single_use_drone([integer]) :: :ok
+  defp run_single_use_drone(firmware) do
     task = Task.async(
       IntCodeBoost,
       :execute,
