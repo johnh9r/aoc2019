@@ -24,3 +24,6 @@ oxygen_supply-*.tar
 
 # vim
 *.sw?
+
+# custom convention
+__*__.txt
