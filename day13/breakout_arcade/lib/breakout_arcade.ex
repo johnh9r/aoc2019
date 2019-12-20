@@ -270,10 +270,6 @@ defmodule BreakoutArcade.WorldAffairs do
   def block, do: @block
   def paddle, do: @paddle
   def ball, do: @ball
-
-  def j_, do: @joy_neutral
-  def jl, do: @joy_left
-  def jr, do: @joy_right
 end
 
 
@@ -283,7 +279,6 @@ defmodule BreakoutArcade do
   """
 
   alias BreakoutArcade.WorldAffairs
-  # import BreakoutArcade.WorldAffairs, only: [jl: 0, j_: 0, jr: 0]
 
   @doc """
   part 2
@@ -299,7 +294,7 @@ defmodule BreakoutArcade do
         score: 0,
         # dynamically populated by AutoPlayer _after_ initial scoring event;
         # initial state has ball heading straight towards paddle, so just hold still
-        joy_moves: [],  #[j_, j_, j_, j_, j_, j_],
+        joy_moves: [],
         next_action: WorldAffairs.coord_x()
       ]
     )
