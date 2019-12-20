@@ -24,3 +24,9 @@ nano_fuel-*.tar
 
 # vim
 *.sw?
+
+# custom convention
+__*__.txt
+
+# custom convention
+__*__.txt
