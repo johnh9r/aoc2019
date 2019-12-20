@@ -44,7 +44,7 @@ defmodule RoboPaintWorld do
     @west  :west
 
     # implicitly coloured panels were painted prior to robot starting (with movement_count == 0)
-    @preexisting -1
+    @by_default -1
 
     @doc """
     """
@@ -133,7 +133,7 @@ defmodule RoboPaintWorld do
               {new_location, new_direction} = next_location_and_direction(location, direction, value)
 
               # default square to black iff newly discovered
-              new_panels = Map.put_new(panels, new_location, [{@blk, @preexisting}])
+              new_panels = Map.put_new(panels, new_location, [{@blk, @by_default}])
               Keyword.merge(
                 state, [
                   panels: new_panels,
@@ -190,10 +190,10 @@ defmodule RoboPaintWorld do
       # |> IO.inspect(label: "\nloc_dir")
     end
 
-    # auxiliary methods to share select constants with enclosing module
+    # auxiliary functions to share select constants with enclosing module
     def black, do: @blk
     def white, do: @wht
-    def preexisting, do: @preexisting
+    def by_default, do: @by_default
     def north, do: @north
     def paint, do: @do_paint
   end
@@ -207,7 +207,7 @@ defmodule RoboPaintWorld do
   def paint_registration_markings(firmware) do
     {:ok, _pid} = WorldAffairs.initialize(
       [
-        panels: %{{0, 0} => [{WorldAffairs.white(), WorldAffairs.preexisting()}]},
+        panels: %{{0, 0} => [{WorldAffairs.white(), WorldAffairs.by_default()}]},
         location: {0, 0},
         direction: WorldAffairs.north(),
         # robot has not yet moved, but may paint immediately
@@ -246,7 +246,7 @@ defmodule RoboPaintWorld do
   def count_panels_painted(firmware) do
     {:ok, _pid} = WorldAffairs.initialize(
       [
-        panels: %{{0, 0} => [{WorldAffairs.black(), WorldAffairs.preexisting()}]},
+        panels: %{{0, 0} => [{WorldAffairs.black(), WorldAffairs.by_default()}]},
         location: {0, 0},
         direction: WorldAffairs.north(),
         # robot has not yet moved, but may paint immediately
@@ -265,7 +265,7 @@ defmodule RoboPaintWorld do
     |> Map.to_list()
     |> Enum.reject(
       fn {{_x, _y}, [{colour, age} | _]} = square ->
-        {colour, age} == {WorldAffairs.black(), WorldAffairs.preexisting()}
+        {colour, age} == {WorldAffairs.black(), WorldAffairs.by_default()}
       end
     )
     |> Kernel.length()
