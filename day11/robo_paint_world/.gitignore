@@ -24,3 +24,6 @@ robo_paint_world-*.tar
 
 # vim
 *.sw?
+
+# custom convention
+__*__.txt
