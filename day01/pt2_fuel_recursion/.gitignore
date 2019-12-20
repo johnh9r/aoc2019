@@ -22,3 +22,8 @@ erl_crash.dump
 # Ignore package tarball (built via "mix hex.build").
 fuel_recursion-*.tar
 
+# vim
+*.sw?
+
+# # custom convention
+__*__.txt
