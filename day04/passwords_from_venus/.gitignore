@@ -24,3 +24,6 @@ passwords_from_venus-*.tar
 
 # vim
 .sw?
+
+# custom convention
+__*__.txt
