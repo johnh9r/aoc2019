@@ -24,3 +24,6 @@ asteroids-*.tar
 
 # vim
 *.sw?
+
+# custom convention
+__*__.txt
