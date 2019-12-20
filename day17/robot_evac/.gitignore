@@ -24,3 +24,6 @@ robot_evac-*.tar
 
 # vim
 *.sw?
+
+# custom convention
+__*__.txt
