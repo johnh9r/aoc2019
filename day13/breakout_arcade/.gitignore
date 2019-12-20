@@ -24,3 +24,6 @@ breakout_arcade-*.tar
 
 # vim
 *.sw?
+
+# custom convention
+__*__.txt
