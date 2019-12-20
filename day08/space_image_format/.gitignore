@@ -24,3 +24,6 @@ space_image_format-*.tar
 
 # vim
 *.sw?
+
+# custom convention
+__*__.txt
