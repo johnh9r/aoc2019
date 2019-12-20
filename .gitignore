@@ -1,0 +1,5 @@
+# vim
+*.sw?
+
+# custom convention
+__*__.txt
