@@ -24,3 +24,6 @@ int_code_plus-*.tar
 
 # vim
 *.sw?
+
+# custom convention
+__*__.txt
