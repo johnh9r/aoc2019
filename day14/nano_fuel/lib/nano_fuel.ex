@@ -11,11 +11,17 @@ defmodule NanoFuel do
   * [A* search algorithm](https://en.wikipedia.org/wiki/A*_search_algorithm)
   * pull (FUEL seeks ingredients)  _vs_  push (ORE offers higher synthesis products)
 
+  ## notes
+  * "Almost every chemical is produced by exactly one reaction;
+      the only exception, ORE, is the raw material input to the entire process
+      and is not produced by a reaction."
+
   ## assumptions
   * target is always exactly 1 FUEL
   * input is DAG and connected
   * input has single root node FUEL
   * all quantities are integers
+  * no undefined products (i.e. w/o synthesis equation)
   """
 
   @doc """
@@ -68,22 +74,116 @@ defmodule NanoFuel do
           )
         end
       )
-      |> IO.inspect(label: "\nes")
 
     graph =
       Graph.new()
       |> Graph.add_edges(reaction_edges)
 
-    graph
-    |> Graph.Pathfinding.all(:fuel, :ore)
-    |> IO.inspect()
+    resolve_ingredients(graph, %{:fuel => 1})
+    |> IO.inspect(label: "\nresult")
+
+    # [
+    #   [:fuel, :e, :d, :c, :b, :ore],
+    #   [:fuel, :e, :d, :c, :a, :ore],
+    #   [:fuel, :e, :d, :a, :ore],
+    #   [:fuel, :e, :a, :ore],
+    #   [:fuel, :a, :ore]
+    # ]
+    #
+    # graph
+    # |> Graph.Pathfinding.all(:fuel, :ore)
+    # |> IO.inspect()
   end
 
-  @doc """
-  transform "7 A, 1 B => 1 C" into { {1, "C"},  [{7, "A"}, {1, "B"}] }
-  """
+  # 1 FUEL <= 7A + 1E
+  # 1 FUEL <= 7A + (7A + 1D)
+  # 1 FUEL <= 7A + (7A + (7A + 1C))
+  # 1 FUEL <= 7A + (7A + (7A + (7A + 1B)))
+  # 1 FUEL <= 7A + (7A + (7A + (7A + (1ORE))))
+  # 1 FUEL <= 7A + (7A + (7A + (7A + (1ORE))))
+
+  @spec resolve_ingredients(Graph.t(), map) :: {map, map}
+  def resolve_ingredients(_graph, %{:ore => n}) do
+    # most basic ingredient always obtainable in exact quantity (w/o anything spare)
+    {%{:ore => n}, %{}}
+    # |> IO.inspect(label: "\nr_i(ore)")
+  end
+
+  # XXX consider: %{:a => 7} and {:a, {10,10}, :ore}
+  # product = :a, quantity = 7
+  # precursor :ore
+  # q_prod_out = 10, q_pre_in = 10
+  # n_repeat = ceil(quantity / q_prod_out) = ceil(7 / 10) = 1
+  # q_pre_req = n_repeat * q_pre_in = 1 * 10
+  # q_prod_spare = n_repeat * q_prod_out - quantity = 1 * 10 - 7 = 3
+  def resolve_ingredients(graph, prod_quant) do
+    # built-in sanity check: single synthesis target (key-value pair)
+    [{product, quantity}] = Enum.into(prod_quant, [])
+    IO.inspect({product, quantity}, label: "\nr_i(want)")
+
+    Graph.out_neighbors(graph, product)
+    |> Enum.sort_by(fn pre -> (Graph.get_shortest_path(graph, pre, :ore) || []) |> Kernel.length() end)
+    |> Enum.reverse()
+    # |> IO.inspect(label: "\nr_i(ngh)")
+    |> Enum.reduce(
+      {%{}, %{}},
+      fn precursor, {acc_used, acc_spare} ->
+        # at most one connection between any two nodes
+        [%Graph.Edge{label: {q_prod_out, q_pre_in}}] = Graph.edges(graph, product, precursor)
+        # IO.inspect({product, q_prod_out, q_pre_in, precursor}, label: "\nr_i(ratio)")
+        n_repeat = ceil(quantity / q_prod_out)
+        q_pre_req = n_repeat * q_pre_in
+        q_prod_spare = n_repeat * q_prod_out - quantity
+
+        case Map.get(acc_spare, precursor, 0) >= q_pre_in do
+          # either have enough precursor spare (from earlier reactions) ...
+          true ->
+            {
+              # precursor usage already accounted when spare product was created
+              # Map.get_and_update(acc_used, precursor, fn value -> {value, (value || 0) + q_pre_in} end) |> Kernel.elem(1),
+              acc_used,
+
+              # TODO rewrite w/ Map.merge/3
+              acc_spare
+              |> Map.get_and_update(precursor, fn value -> {value, value - q_pre_in} end) |> Kernel.elem(1)
+            }
+            |> IO.inspect(label: "\nr_i(spare)")
+
+          _ ->
+            # ... or else need to synthesise
+            {synth_used, synth_spare} = resolve_ingredients(graph, %{precursor => n_repeat * q_pre_in})
+
+            # never less produced than required, ...
+            case q_prod_spare > 0 do
+              # ... but record any excess separately
+              true -> 
+                {
+                  acc_used
+                  |> Map.merge(synth_used, fn _k, v1, v2 -> v1 + v2 end),
+
+                  acc_spare
+                  |> Map.merge(synth_spare, fn _k, v1, v2 -> v1 + v2 end)
+                  |> Map.merge(%{product => q_prod_spare}, fn _k, v1, v2 -> v1 + v2 end)
+                }
+
+              _ ->
+                {
+                  acc_used
+                  |> Map.merge(synth_used, fn _k, v1, v2 -> v1 + v2 end),
+
+                  acc_spare
+                  |> Map.merge(synth_spare, fn _k, v1, v2 -> v1 + v2 end)
+                }
+            end
+            |> IO.inspect(label: "\nr_i(synth)")
+        end
+      end
+    )
+  end
+
+  # transform "7 A, 1 B => 1 C" into { {1, "C"},  [{7, "A"}, {1, "B"}] }
   @spec parse(String.t()) :: [{{integer, String.t()}, [{integer, String.t()}]}]
-  def parse(equations) do
+  defp parse(equations) do
     equations
     |> String.trim()
     |> String.split(~r/\n/, trim: true)
