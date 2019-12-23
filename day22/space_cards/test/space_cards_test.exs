@@ -1,6 +1,6 @@
 defmodule SpaceCardsTest do
   use ExUnit.Case
-  doctest SpaceCards
+  doctest SpaceCards, only: [shuffle_by_single_card_tracing_techniques: 3]
 
   setup do
     my_insns = """
@@ -106,12 +106,50 @@ defmodule SpaceCardsTest do
       deal with increment 47
       """
  
-    [techniques: my_insns]
+    [
+      techniques: my_insns,
+
+      deck_size_pt1: 10_007,
+      target_card_pt1: 2019,
+
+      deck_size_pt2: 119_315_717_514_047,
+      target_card_pt2: 2020
+    ]
+  end
+
+  # NOTE: number of reps not computationally feasible; even at 1M iter/s, requiring >3y
+  #
+  @tag :challenge_pt2
+  test "(part 2) correctly processes personal challenge", context do
+    final_pos_target_card =
+      1..101_741_582_076_661
+      |> Enum.reduce(
+        context[:target_card_pt2],
+        fn _i, acc ->
+          IO.inspect({_i, acc})
+          SpaceCards.shuffle_by_single_card_tracing_techniques(
+            context[:techniques],
+            context[:deck_size_pt2],
+            acc
+          )
+        end
+      )
+    # too high: 96_951_829_818_229
+    assert final_pos_target_card == -1
   end
 
   @tag :challenge_pt1
   test "(part 1) correctly processes personal challenge", context do
-    result = SpaceCards.shuffle_by_techniques(context[:techniques], 10_007)
-    assert Enum.find_index(result, fn x -> x == 2019 end) == 4_096
+    assert 4_096 == SpaceCards.shuffle_by_single_card_tracing_techniques(
+      context[:techniques],
+      context[:deck_size],
+      context[:target_card_pt1]
+    )
   end
+
+  # @tag :challenge_pt1
+  # test "(part 1) correctly processes personal challenge", context do
+  #   result = SpaceCards.shuffle_by_techniques(context[:techniques], 10_007)
+  #   assert Enum.find_index(result, fn x -> x == 2019 end) == 4_096
+  # end
 end
