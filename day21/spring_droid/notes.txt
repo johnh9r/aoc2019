@@ -1,0 +1,368 @@
+##  (Well-grounded) Assumptions
+* one-dimensional world consisting of linear sequence of ground and holes
+* springdroid moves forward one tile iff not jumping
+* springdroid clears three tiles in direction of travel iff jumping and lands on fourth tile
+    - holes can be at most three tiles wide (since game is evidently meant to be solvable)
+
+##  Ideas
+* pattern detection, then boolean expression encoded in springscript (max 15 instructions)
+* Karnaugh Diagram to simplify four-valued (abcd) boolean expression
+
+?!? land as early as possible after clearing any hole to keep maximum options open
+    abcd
+    __.#    <!< must jump at some point to clear hole of 1+ tiles width
+    ####    <!< keep moving
+    ###.    <!< keep moving
+    ##..    <!< keep moving
+    #...    <!< keep moving
+                following tiles must be ground (i.e. keep going)
+                or hole of some size: .# | ..# | ...# | ....#
+    @
+    ####.#
+
+?!? jump if landing site safe (and don't care whether clearing hole or ground)
+    situation arising will -- once again -- be one of those below
+
+
+ __implicitly, springdroid needs to stand on ground for it still to be in play
+/
+|
+v
+@abcd (b10)v- !a || (!b && d) || (!c && d)
+
+%....   0  1  -/+           <!< don't care: dead either way
+%...#   1  1    jump (must)
+%..#.   2  1  -/+           <!< don't care: dead either way
+%..##   3  1    jump (must)
+%.#..   4  1  -/+           <!< don't care: dead either way
+%.#.#   5  1    jump (must)
+%.##.   6  1  -/+           <!< don't care: dead either way
+%.###   7  1  jump (must)
+%#...   8  0  move (must)
+%#..#   9  1  jump (ideal)
+%#.#.  10  0  move (must)
+%#.##  11  1  jump        <!< tweaking point if unsuccessful at first
+%##..  12  0  move (must)
+%##.#  13  1  jump (ideal)
+%###.  14  0  move (must)
+%####  15  0  move (for max options)
+
+=== [part 2] ===
+
+     +hi: don't care
+@abcdefg dec v- ...
+
+%.......   0  _  d/c
+%......#   1  _  d/c
+%.....#.   2  _  d/c
+%.....##   3  _  d/c
+%....#..   4  _  d/c
+%....#.#   5  _  d/c
+%....##.   6  _  d/c
+%....###   7  _  d/c
+%...#...   8  1  jump!
+%...#..#   9  1  jump!
+%...#.#.  10  1  jump!
+%...#.##  11  1  jump!
+%...##..  12  1  jump!
+%...##.#  13  1  jump!
+%...###.  14  1  jump!
+%...####  15  1  jump!
+%..#....  16  _  d/c
+%..#...#  17  _  d/c
+%..#..#.  18  _  d/c
+%..#..##  19  _  d/c
+%..#.#..  20  _  d/c
+%..#.#.#  21  _  d/c
+%..#.##.  22  _  d/c
+%..#.###  23  _  d/c
+%..##...  24  1  jump!
+%..##..#  25  1  jump!
+%..##.#.  26  1  jump!
+%..##.##  27  1  jump!
+%..###..  28  1  jump!
+%..###.#  29  1  jump!
+%..####.  30  1  jump!
+%..#####  31  1  jump!
+%.#.....  32  _  d/c
+%.#....#  33  _  d/c
+%.#...#.  34  _  d/c
+%.#...##  35  _  d/c
+%.#..#..  36  _  d/c
+%.#..#.#  37  _  d/c
+%.#..##.  38  _  d/c
+%.#..###  39  _  d/c
+%.#.#...  40  1  jump!
+%.#.#..#  41  1  jump!
+%.#.#.#.  42  1  jump!
+%.#.#.##  43  1  jump!
+%.#.##..  44  1  jump!
+%.#.##.#  45  1  jump!
+%.#.###.  46  1  jump!
+%.#.####  47  1  jump!
+%.##....  48  _  d/c
+%.##...#  49  _  d/c
+%.##..#.  50  _  d/c
+%.##..##  51  _  d/c
+%.##.#..  52  _  d/c
+%.##.#.#  53  _  d/c
+%.##.##.  54  _  d/c
+%.##.###  55  _  d/c
+%.###...  56  1  jump!
+%.###..#  57  1  jump!
+%.###.#.  58  1  jump!
+%.###.##  59  1  jump!
+%.####..  60  1  jump!
+%.####.#  61  1  jump!
+%.#####.  62  1  jump!
+%.######  63  1  jump!
+
+%#......  64  _  move!
+%#.....#  65  _  move!
+%#....#.  66  _  move!
+%#....##  67  _  move!
+%#...#..  68  _  move!
+%#...#.#  69  _  move!
+%#...##.  70  _  move!
+%#...###  71  _  move!
+%#..#...  72  1  jump!
+%#..#..#  73  1  jump!
+%#..#.#.  74  1  jump!
+%#..#.##  75  1  jump!
+%#..##..  76  1  jump!
+%#..##.#  77  1  jump!
+%#..###.  78  1  jump!
+%#..####  79  1  jump!
+%#.#....  80  _  move!
+%#.#...#  81  _  move!
+%#.#..#.  82  _  move!
+%#.#..##  83  _  move!
+%#.#.#..  84  _  move!
+%#.#.#.#  85  _  move!
+%#.#.##.  86  _  move!
+%#.#.###  87  _  move!
+%#.##...  88  1  jump!
+%#.##..#  89  1  jump!
+%#.##.#.  90  1  jump!
+%#.##.##  91  1  jump!
+%#.###..  92  _  ?
+%#.###.#  93  _  ?
+%#.####.  94  _  ?
+%#.#####  95  _  ?
+%##.....  96  _  d/c
+%##....#  97  _  d/c
+%##...#.  98  _  move!
+%##...##  99  _  move!
+%##..#.. 100  _  move!
+%##..#.# 101  _  move!
+%##..##. 102  _  move!
+%##..### 103  _  move!
+%##.#... 104  1  jump!
+%##.#..# 105  1  jump! (else FAIL2)
+%##.#.#. 106  1  move! (else FAIL 5) _vs_ jump! (else FAIL3)
+%##.#.## 107  0  move (else potentially FAIL1, FAIL4)
+%##.##.. 108  1  jump (pref)
+%##.##.# 109  1  jump (pref)
+%##.###. 110  1  jump (pref)
+%##.#### 111  1  jump (pref)
+%###.... 112  _  d/c
+%###...# 113  _  move!
+%###..#. 114  _  move!
+%###..## 115  _  move!
+%###.#.. 116  _  move!
+%###.#.# 117  _  move!
+%###.##. 118  _  move!
+%###.### 119  _  move!
+%####... 120  _  move (safer), not jump (quicker)
+%####..# 121  _  move (safer), not jump (quicker)
+%####.#. 122  _  move (safer)
+%####.## 123  _  move (safer)
+%#####.. 124  _  move (safer)
+%#####.# 125  _  move (safer)
+%######. 126  _  move (safer)
+%####### 127  _  move (safer)
+
+not(A) || 6-bit QMcC
+one: 8,9,10,11,12,13,14,15; 24,25,26,27; 40,41,42,!,44,45,46,47
+d/c: 32, 33, 48
+
+A' + B'DE' + C'DF' + C'DG' + C'DE
+             ~~~     ~~~     ~~~
+===
+
+ARGH -- 8th bit (h) is significant
+
+         @      (@0     (@)   (@)       jump, else: move+dead, else: move+move+jump+dead
+FAIL(3)  % # # . # . # . # # . # # # #
+  7-bit    a b c d e f g!+!
+FAIL(5)  % # # . # . # . . . # # # # #  move, else: jump+dead
+         @(@-@)     (@)     (@)
+
+%#....... 128 ff _  d/c
+%#......# 129 ff _  d/c
+%#.....#. 130 ff _  d/c
+%#.....## 131 ff _  d/c
+%#....#.. 132 ff _  d/c
+%#....#.# 133 ff _  d/c
+%#....##. 134 ff _  d/c
+%#....### 135 ff _  d/c
+%#...#... 136 ff _  move!
+%#...#..# 137 ff _  move!
+%#...#.#. 138 ff _  move!
+%#...#.## 139 ff _  move!
+%#...##.. 140 ff _  move!
+%#...##.# 141 ff _  move!
+%#...###. 142 ff _  move!
+%#...#### 143 ff _  move!
+%#..#.... 144 ff _  d/c
+%#..#...# 145 ff 1  jump!
+%#..#..#. 146 ff _  d/c
+%#..#..## 147 ff 1  jump!
+%#..#.#.. 148 ff _  d/c
+%#..#.#.# 149 ff 1  jump!
+%#..#.##. 150 ff _  d/c
+%#..#.### 151 ff 1  jump!
+%#..##... 152 ff 1  jump (pref)
+%#..##..# 153 ff 1  jump (pref)
+%#..##.#. 154 ff 1  jump (pref)
+%#..##.## 155 ff 1  jump (pref)
+%#..###.. 156 ff 1  jump (pref)
+%#..###.# 157 ff 1  jump (pref)
+%#..####. 158 ff 1  jump (pref)
+%#..##### 159 ff 1  jump (pref)
+%#.#..... 160 ff _  d/c
+%#.#....# 161 ff _  d/c
+%#.#...#. 162 ff _  d/c
+%#.#...## 163 ff _  d/c
+%#.#..#.. 164 ff _  d/c
+%#.#..#.# 165 ff _  d/c
+%#.#..##. 166 ff _  d/c
+%#.#..### 167 ff _  d/c
+%#.#.#... 168 ff _  move!
+%#.#.#..# 169 ff _  move!
+%#.#.#.#. 170 ff _  move!
+%#.#.#.## 171 ff _  move!
+%#.#.##.. 172 ff _  move!
+%#.#.##.# 173 ff _  move!
+%#.#.###. 174 ff _  move!
+%#.#.#### 175 ff _  move!
+%#.##.... 176 ff _  d/c
+%#.##...# 177 ff 1  jump!
+%#.##..#. 178 ff _  d/c
+%#.##..## 179 ff 1  jump!
+%#.##.#.. 180 ff _  d/c
+%#.##.#.# 181 ff 1  jump!
+%#.##.##. 182 ff _  d/c
+%#.##.### 183 ff 1  jump!
+%#.###... 184 ff 1  jump (pref)
+%#.###..# 185 ff 1  jump (pref)
+%#.###.#. 186 ff 1  jump (mild pref)
+%#.###.## 187 ff 1  jump (mild pref)
+%#.####.. 188 ff 1  jump (mild pref)
+%#.####.# 189 ff 1  jump (mild pref)
+%#.#####. 190 ff 1  jump (mild pref)
+%#.###### 191 ff 1  jump (mild pref)
+%##...... 192 ff _  d/c
+%##.....# 193 ff _  d/c
+%##....#. 194 ff _  d/c
+%##....## 195 ff _  d/c
+%##...#.. 196 ff _  move!
+%##...#.# 197 ff _  move!
+%##...##. 198 ff _  move!
+%##...### 199 ff _  move!
+%##..#... 200 ff _  move!
+%##..#..# 201 ff _  move!
+%##..#.#. 202 ff _  move!
+%##..#.## 203 ff _  move!
+%##..##.. 204 ff _  move!
+%##..##.# 205 ff _  move!
+%##..###. 206 ff _  move!
+%##..#### 207 ff _  move!
+%##.#.... 208 ff _  d/c
+%##.#...# 209 ff 1  jump!
+%##.#..#. 210 ff _  d/c
+%##.#..## 211 ff 1  jump!
+%##.#.#.. 212 ff _  MOVE! (FAIL_5)
+%##.#.#.# 213 ff 1  JUMP! (FAIL_3)
+%##.#.##. 214 ff _  move!
+%##.#.### 215 ff 1  jump (for combinatorial simplification)
+%##.##... 216 ff 1  jump (ideal)
+%##.##..# 217 ff 1  jump (ideal)
+%##.##.#. 218 ff 1  jump (ideal)
+%##.##.## 219 ff 1  jump (ideal)
+%##.###.. 220 ff 1  jump (ideal)
+%##.###.# 221 ff 1  jump (ideal)
+%##.####. 222 ff 1  jump (ideal)
+%##.##### 223 ff 1  jump (ideal)
+%###..... 224 ff _  d/c
+%###....# 225 ff _  d/c
+%###...#. 226 ff _  move!
+%###...## 227 ff _  move!
+%###..#.. 228 ff _  move!
+%###..#.# 229 ff _  move!
+%###..##. 230 ff _  move!
+%###..### 231 ff _  move!
+%###.#... 232 ff _  move!
+%###.#..# 233 ff _  move!
+%###.#.#. 234 ff _  move!
+%###.#.## 235 ff _  move!
+%###.##.. 236 ff _  move!
+%###.##.# 237 ff _  move!
+%###.###. 238 ff _  move!
+%###.#### 239 ff _  move!
+%####.... 240 ff _  d/c
+%####...# 241 ff _  move (slower, but combinatorial simplification)
+%####..#. 242 ff _  move!
+%####..## 243 ff _  move (slower, but combinatorial simplification)
+%####.#.. 244 ff _  move!
+%####.#.# 245 ff _  move (slower, but combinatorial simplification)
+%####.##. 246 ff _  move!
+%####.### 247 ff _  move (slower, but combinatorial simplification)
+%#####... 248 ff _  move (slower, but combinatorial simplification)
+%#####..# 249 ff _  move (slower, but combinatorial simplification)
+%#####.#. 250 ff _  move (slower, but combinatorial simplification)
+%#####.## 251 ff _  move (slower, but combinatorial simplification)
+%######.. 252 ff _  move (slower, but combinatorial simplification)
+%######.# 253 ff _  move (slower, but combinatorial simplification)
+%#######. 254 ff _  move (slower, but combinatorial simplification)
+%######## 255 ff _  move (slower, but combinatorial simplification)
+
+1111  F
+1110  E
+1101  D
+1100  C
+1011  B
+1010  A
+1001  9
+1000  8
+
+0111  7
+0110  6
+0101  5
+0100  4
+0011  3
+0010  2
+0001  1
+0000  0
+
+abcd/efgh->     00-7f     +9_  +b_     +d8-df     d0-d3         d_
+|               a'     || b'd       || c'de    || c'de'f'  || c'de'h
+v
+   _0 _1 _2 _3 _4 _5 _6 _7 _8 _9 _A _B _C _D _E _F
+0   J  J  J  J  J  J  J  J  J  J  J  J  J  J  J  J
+1   J  J  J  J  J  J  J  J  J  J  J  J  J  J  J  J
+2   J  J  J  J  J  J  J  J  J  J  J  J  J  J  J  J
+3   J  J  J  J  J  J  J  J  J  J  J  J  J  J  J  J
+4   J  J  J  J  J  J  J  J  J  J  J  J  J  J  J  J
+5   J  J  J  J  J  J  J  J  J  J  J  J  J  J  J  J
+6   J  J  J  J  J  J  J  J  J  J  J  J  J  J  J  J
+7   J  J  J  J  J  J  J  J  J  J  J  J  J  J  J  J
+
+8
+9   j  J  j  J  %  J  %  J  J  J  J  J  J  J  J  J
+A
+B   j  J  j  J  %  J  %  J  i  i  i  i  i  i  i  i
+C
+D   j  J  j  J  _  J  _  i  i  i  i  i  i  i  i  i
+E
+F

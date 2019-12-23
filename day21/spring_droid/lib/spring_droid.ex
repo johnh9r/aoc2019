@@ -37,43 +37,6 @@ defmodule SpringDroid.WorldAffairs do
         IO.write(" ")
     end
   end
-
-  # @spec render_screen(%{required({integer, integer}) => integer}) :: iodata
-  # defp render_screen(tiles) do
-  #   tiles
-  #   # use y-coordinate as dominant sort key in order to form scan lines
-  #   |> Enum.group_by(fn {{_x, y}, _tile_id} -> y end)
-  #   |> Enum.into(
-  #     [],
-  #     fn {_group_key_y, tiles} ->
-  #       tiles
-  #       |> Enum.sort_by(fn {{x, _y},_} -> x end)
-  #       |> Enum.map(fn {{_x,_y}, tile_id} -> tile_id end)
-  #     end
-  #   )
-  #   |> Enum.map(
-  #     fn tiles_in_scan_line ->
-  #       tiles_in_scan_line
-  #       |> Enum.reduce(
-  #         [],
-  #         fn tile_id, acc ->
-  #           tile_ch =
-  #             case tile_id do
-  #               @empty -> " "
-  #               @wall -> "#"
-  #               @block -> "*"
-  #               @paddle -> "^"
-  #               @ball -> "O"
-  #               x -> raise "unknown tile_id #{x}"
-  #             end
-  #           [tile_ch | acc]
-  #         end
-  #       )
-  #     end
-  #   )
-  #   |> Enum.map(&Enum.reverse/1)
-  #   |> Enum.intersperse("\n")
-  # end
 end
 
 
@@ -87,7 +50,7 @@ defmodule SpringDroid do
   @doc """
   part 2
 
-  not(A) is trivial and further six sensors can be [solved by Quine-McCluskey](http://32x8.com/sop6_____A-B-C-D-E-F_____m_8-9-10-11-12-13-14-15-24-25-26-27-40-41-42-44-45-46-47_____d_32-33-48_____option-0_____899788975371824592809), taking care to rename variables
+  best brush up on your [Boolean algebra](https://en.wikipedia.org/wiki/Boolean_algebra#Laws)
   """
   @spec calc_hull_damage_running([integer]) :: integer
   def calc_hull_damage_running(firmware) do
@@ -95,29 +58,27 @@ defmodule SpringDroid do
       [
         damage: nil,
         #
-        #        v       v       v       v
-        # A' + B'DE' + C'DF' + C'DG' + C'DE
-        #              ~~~     ~~~     ~~~
-        # by distributivity of AND over OR(+):
+        # A' + B'D + C'DE + C'DE'F' + C'DE'H    <!< from notes.txt
         #
-        # A' + B'DE' + C'D(F' + G' + E)
+        # by distributivity of AND over OR:
         #
-        # by DeMorgan's Law:
+        # A' + B'D + C'D(E + E'F' + E'H)
         #
-        # A' + (BD'E)' + C'D(F' + G' + E)
+        # evidently max 15 _logic_ instructions (not counting RUN)
         #
         spring_script: """
-          NOT F T
-          NOT G J
+          NOT E T
+          NOT F J
+          AND T J
+          NOT E T
+          AND H T
           OR T J
           OR E J
           NOT C T
           AND D T
           AND T J
-          NOT D T
-          OR B T
-          OR E T
-          NOT T T
+          NOT B T
+          AND D T
           OR T J
           NOT A T
           OR T J
