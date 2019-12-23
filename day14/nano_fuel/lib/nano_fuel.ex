@@ -3,14 +3,6 @@ defmodule NanoFuel do
   given set of quantified chemical equations, determine minimum number
   of units of of ORE (= raw input) required to produce one unit of FUEL
 
-  ## ideas
-  * expanding wavefront (breadth-first)?
-  * dynamic programming (i.e. cache partial results for later recombination)?
-  * https://en.wikipedia.org/wiki/And%E2%80%93or_tree
-  * post-order traversal: starting from FUEL
-  * [A* search algorithm](https://en.wikipedia.org/wiki/A*_search_algorithm)
-  * pull (FUEL seeks ingredients)  _vs_  push (ORE offers higher synthesis products)
-
   ## notes
   * "Almost every chemical is produced by exactly one reaction;
       the only exception, ORE, is the raw material input to the entire process
@@ -25,22 +17,6 @@ defmodule NanoFuel do
   """
 
   @doc """
-  # 1 FUEL
-  #   |
-  #   \_(1:7)_A_________________________(10:10)_ORE
-  #   \_(1:1)_E                        / |
-  #           \_(1:7)_A_______________/  |
-  #           \_(1:1)_D              /   |
-  #                   \_(1:7)_A_____/    |
-  #                   \_(1:1)_C          |
-  #                           \_(1:7)_A__+
-  #                           \_(1:1)_B
-  #                                   \_(1:1)_ORE
-  #
-  # BFS: paths from root (FUEL) to each leaf (ORE ?!)
-  # for each candidate
-  #
-  # 1 FUEL = 7A + (7A + (7A + (7A + 1_ORE))) = (10_ORE + 10_ORE + 10_ORE) + 1_ORE = 31_ORE
   iex> NanoFuel.calc_minimum_ore_for_fuel(~s{
   ...> 10 ORE => 10 A
   ...> 1 ORE => 1 B
@@ -50,25 +26,77 @@ defmodule NanoFuel do
   ...> 7 A, 1 E => 1 FUEL
   ...> })
   31
+
+  iex> NanoFuel.calc_minimum_ore_for_fuel(~s{
+  ...> 9 ORE => 2 A
+  ...> 8 ORE => 3 B
+  ...> 7 ORE => 5 C
+  ...> 3 A, 4 B => 1 AB
+  ...> 5 B, 7 C => 1 BC
+  ...> 4 C, 1 A => 1 CA
+  ...> 2 AB, 3 BC, 4 CA => 1 FUEL
+  ...> })
+  168
+
+  iex> NanoFuel.calc_minimum_ore_for_fuel(~s{
+  ...> 157 ORE => 5 NZVS
+  ...> 165 ORE => 6 DCFZ
+  ...> 44 XJWVT, 5 KHKGT, 1 QDVJ, 29 NZVS, 9 GPVTF, 48 HKGWZ => 1 FUEL
+  ...> 12 HKGWZ, 1 GPVTF, 8 PSHF => 9 QDVJ
+  ...> 179 ORE => 7 PSHF
+  ...> 177 ORE => 5 HKGWZ
+  ...> 7 DCFZ, 7 PSHF => 2 XJWVT
+  ...> 165 ORE => 2 GPVTF
+  ...> 3 DCFZ, 7 NZVS, 5 HKGWZ, 10 PSHF => 8 KHKGT
+  ...> })
+  13_312
+
+  iex> NanoFuel.calc_minimum_ore_for_fuel(~s{
+  ...> 2 VPVL, 7 FWMGM, 2 CXFTF, 11 MNCFX => 1 STKFG
+  ...> 17 NVRVD, 3 JNWZP => 8 VPVL
+  ...> 53 STKFG, 6 MNCFX, 46 VJHF, 81 HVMC, 68 CXFTF, 25 GNMV => 1 FUEL
+  ...> 22 VJHF, 37 MNCFX => 5 FWMGM
+  ...> 139 ORE => 4 NVRVD
+  ...> 144 ORE => 7 JNWZP
+  ...> 5 MNCFX, 7 RFSQX, 2 FWMGM, 2 VPVL, 19 CXFTF => 3 HVMC
+  ...> 5 VJHF, 7 MNCFX, 9 VPVL, 37 CXFTF => 6 GNMV
+  ...> 145 ORE => 6 MNCFX
+  ...> 1 NVRVD => 8 CXFTF
+  ...> 1 VJHF, 6 MNCFX => 4 RFSQX
+  ...> 176 ORE => 6 VJHF
+  ...> })
+  180_697
+
+  iex> NanoFuel.calc_minimum_ore_for_fuel(~s{
+  ...> 171 ORE => 8 CNZTR
+  ...> 7 ZLQW, 3 BMBT, 9 XCVML, 26 XMNCP, 1 WPTQ, 2 MZWV, 1 RJRHP => 4 PLWSL
+  ...> 114 ORE => 4 BHXH
+  ...> 14 VRPVC => 6 BMBT
+  ...> 6 BHXH, 18 KTJDG, 12 WPTQ, 7 PLWSL, 31 FHTLT, 37 ZDVW => 1 FUEL
+  ...> 6 WPTQ, 2 BMBT, 8 ZLQW, 18 KTJDG, 1 XMNCP, 6 MZWV, 1 RJRHP => 6 FHTLT
+  ...> 15 XDBXC, 2 LTCX, 1 VRPVC => 6 ZLQW
+  ...> 13 WPTQ, 10 LTCX, 3 RJRHP, 14 XMNCP, 2 MZWV, 1 ZLQW => 1 ZDVW
+  ...> 5 BMBT => 4 WPTQ
+  ...> 189 ORE => 9 KTJDG
+  ...> 1 MZWV, 17 XDBXC, 3 XCVML => 2 XMNCP
+  ...> 12 VRPVC, 27 CNZTR => 2 XDBXC
+  ...> 15 KTJDG, 12 BHXH => 5 XCVML
+  ...> 3 BHXH, 2 VRPVC => 7 MZWV
+  ...> 121 ORE => 7 VRPVC
+  ...> 7 XCVML => 6 RJRHP
+  ...> 5 BHXH, 4 VRPVC => 5 LTCX
+  ...> })
+  2_210_736
   """
   @spec calc_minimum_ore_for_fuel(String.t()) :: integer
   def calc_minimum_ore_for_fuel(equations) do
     reaction_edges =
       parse(equations)
-      # [
-      #   {{10, :a},    [{10, :ore}]},
-      #   { {1, :b},    [{ 1, :ore}]},
-      #   { {1, :c},    [{ 7, :a}, {1, :b}]},
-      #   { {1, :d},    [{ 7, :a}, {1, :c}]},
-      #   { {1, :e},    [{ 7, :a}, {1, :d}]},
-      #   { {1, :fuel}, [{ 7, :a}, {1, :e}]}
-      # ]
       |> Enum.flat_map(
         fn {{prod_quant, prod_kind}, quant_ingreds} ->
           quant_ingreds
           |> Enum.map(
             fn {ingred_quant, ingred_kind} ->
-              # XXX ratio (of integers) may not be accurately representable as float (edge weight)
               Graph.Edge.new(prod_kind, ingred_kind, label: {prod_quant, ingred_quant})
             end
           )
@@ -81,41 +109,15 @@ defmodule NanoFuel do
 
     resolve_ingredients(graph, %{:fuel => 1})
     |> IO.inspect(label: "\nresult")
-
-    # [
-    #   [:fuel, :e, :d, :c, :b, :ore],
-    #   [:fuel, :e, :d, :c, :a, :ore],
-    #   [:fuel, :e, :d, :a, :ore],
-    #   [:fuel, :e, :a, :ore],
-    #   [:fuel, :a, :ore]
-    # ]
-    #
-    # graph
-    # |> Graph.Pathfinding.all(:fuel, :ore)
-    # |> IO.inspect()
+    |> (fn {%{:ore => n} = acc_used, _} -> n end).()
   end
-
-  # 1 FUEL <= 7A + 1E
-  # 1 FUEL <= 7A + (7A + 1D)
-  # 1 FUEL <= 7A + (7A + (7A + 1C))
-  # 1 FUEL <= 7A + (7A + (7A + (7A + 1B)))
-  # 1 FUEL <= 7A + (7A + (7A + (7A + (1ORE))))
-  # 1 FUEL <= 7A + (7A + (7A + (7A + (1ORE))))
 
   @spec resolve_ingredients(Graph.t(), map) :: {map, map}
   def resolve_ingredients(_graph, %{:ore => n}) do
     # most basic ingredient always obtainable in exact quantity (w/o anything spare)
     {%{:ore => n}, %{}}
-    # |> IO.inspect(label: "\nr_i(ore)")
   end
 
-  # XXX consider: %{:a => 7} and {:a, {10,10}, :ore}
-  # product = :a, quantity = 7
-  # precursor :ore
-  # q_prod_out = 10, q_pre_in = 10
-  # n_repeat = ceil(quantity / q_prod_out) = ceil(7 / 10) = 1
-  # q_pre_req = n_repeat * q_pre_in = 1 * 10
-  # q_prod_spare = n_repeat * q_prod_out - quantity = 1 * 10 - 7 = 3
   def resolve_ingredients(graph, prod_quant) do
     # built-in sanity check: single synthesis target (key-value pair)
     [{product, quantity}] = Enum.into(prod_quant, [])
