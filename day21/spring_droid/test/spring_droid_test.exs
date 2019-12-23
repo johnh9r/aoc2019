@@ -12,6 +12,11 @@ defmodule SpringDroidTest do
 
   @tag :challenge_pt1
   test "(part 1) correctly processes personal challenge", context do
-    assert SpringDroid.calc_hull_damage(context[:firmware]) == 19_359_752
+    assert SpringDroid.calc_hull_damage_walking(context[:firmware]) == 19_359_752
+  end
+
+  @tag :challenge_pt2
+  test "(part 2) correctly processes personal challenge", context do
+    assert SpringDroid.calc_hull_damage_running(context[:firmware]) == -1
   end
 end

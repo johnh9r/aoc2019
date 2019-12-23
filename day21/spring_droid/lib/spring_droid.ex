@@ -85,16 +85,69 @@ defmodule SpringDroid do
   alias SpringDroid.WorldAffairs
 
   @doc """
+  part 2
+
+  not(A) is trivial and further six sensors can be [solved by Quine-McCluskey](http://32x8.com/sop6_____A-B-C-D-E-F_____m_8-9-10-11-12-13-14-15-24-25-26-27-40-41-42-44-45-46-47_____d_32-33-48_____option-0_____899788975371824592809), taking care to rename variables
+  """
+  @spec calc_hull_damage_running([integer]) :: integer
+  def calc_hull_damage_running(firmware) do
+    {:ok, _pid} = WorldAffairs.initialize(
+      [
+        damage: nil,
+        #
+        #        v       v       v       v
+        # A' + B'DE' + C'DF' + C'DG' + C'DE
+        #              ~~~     ~~~     ~~~
+        # by distributivity of AND over OR(+):
+        #
+        # A' + B'DE' + C'D(F' + G' + E)
+        #
+        # by DeMorgan's Law:
+        #
+        # A' + (BD'E)' + C'D(F' + G' + E)
+        #
+        spring_script: """
+          NOT F T
+          NOT G J
+          OR T J
+          OR E J
+          NOT C T
+          AND D T
+          AND T J
+          NOT D T
+          OR B T
+          OR E T
+          NOT T T
+          OR T J
+          NOT A T
+          OR T J
+          RUN
+          """
+          |> String.split(~r//, trim: true)
+      ]
+    )
+
+    IO.write("\n")
+    run_spring_droid(firmware)
+
+    kw = WorldAffairs.get_final_state()
+         |> IO.inspect(label: "\nresult")
+
+    Keyword.fetch!(kw, :damage)
+  end
+
+  @doc """
   part 1
 
   ## notes
   * https://en.wikipedia.org/wiki/Karnaugh_map
   """
-  @spec calc_hull_damage([integer]) :: integer
-  def calc_hull_damage(firmware) do
+  @spec calc_hull_damage_walking([integer]) :: integer
+  def calc_hull_damage_walking(firmware) do
     {:ok, _pid} = WorldAffairs.initialize(
       [
         damage: nil,
+        # !a || (!b && d) || (!c && d)
         # really: ["N", "O", "T", " ", "B", " ", "T", "\n", "A", "N", "D", etc.]
         spring_script: """
           NOT B T
