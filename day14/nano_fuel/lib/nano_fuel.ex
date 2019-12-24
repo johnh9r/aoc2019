@@ -36,7 +36,7 @@ defmodule NanoFuel do
   ...> 4 C, 1 A => 1 CA
   ...> 2 AB, 3 BC, 4 CA => 1 FUEL
   ...> })
-  168
+  165
 
   iex> NanoFuel.calc_minimum_ore_for_fuel(~s{
   ...> 157 ORE => 5 NZVS
@@ -107,28 +107,32 @@ defmodule NanoFuel do
       Graph.new()
       |> Graph.add_edges(reaction_edges)
 
-    resolve_ingredients(graph, %{:fuel => 1})
-    |> IO.inspect(label: "\nresult")
-    |> (fn {%{:ore => n} = acc_used, _} -> n end).()
+    {:ok, stash} =
+      Agent.start_link(fn -> %{} end, name: __MODULE__)
+
+    %{:ore => n} =
+      resolve_ingredients(graph, stash, %{:fuel => 1})
+
+    n
   end
 
-  @spec resolve_ingredients(Graph.t(), map) :: {map, map}
-  def resolve_ingredients(_graph, %{:ore => n}) do
+  @spec resolve_ingredients(Graph.t(), pid, map) :: {map, map}
+  def resolve_ingredients(_graph, _stash, %{:ore => n}) do
     # most basic ingredient always obtainable in exact quantity (w/o anything spare)
-    {%{:ore => n}, %{}}
+    %{:ore => n}
   end
 
-  def resolve_ingredients(graph, prod_quant) do
+  def resolve_ingredients(graph, stash, prod_quant) do
     # built-in sanity check: single synthesis target (key-value pair)
     [{product, quantity}] = Enum.into(prod_quant, [])
-    IO.inspect({product, quantity}, label: "\nwant")
+    # IO.inspect({product, quantity}, label: "\nwant")
 
     Graph.out_neighbors(graph, product)
     |> Enum.sort_by(fn pre -> (Graph.get_shortest_path(graph, pre, :ore) || []) |> Kernel.length() end)
     |> Enum.reverse()
     |> Enum.reduce(
-      {%{}, %{}},
-      fn precursor, {acc_used, acc_spare} ->
+      %{},
+      fn precursor, acc_used ->
         # (gen)
         #        1 BC      <=   ... (iteration over neighbouring nodes)
         #        ^ ^          +            7           C
@@ -146,7 +150,7 @@ defmodule NanoFuel do
         # aggressively use stashed excess (if any):
         # even just to reduce (rather than fully eliminate) further production;
         # never mind if any excess reappears as by-product (for stashing)
-        {acc_spare, q_pre_avail} = use_any_spare(acc_spare, precursor, q_pre_req)
+        q_pre_avail = use_any_spare(stash, precursor, q_pre_req)
 
         effective_q_pre_req = q_pre_req - q_pre_avail
         effective_n_repeat = ceil(effective_q_pre_req / q_pre_in)
@@ -154,54 +158,65 @@ defmodule NanoFuel do
         q_prod_spare = effective_n_repeat * q_prod_out + q_pre_avail - quantity
 
         # synthesise remainder (if any)
-        {synth_used, synth_spare} = resolve_ingredients(graph, %{precursor => effective_q_pre_req})
+        synth_used = resolve_ingredients(graph, stash, %{precursor => effective_q_pre_req})
 
         # never _less_ produced than required, ...
-        acc_spare = stash_any_spare(acc_spare, product, q_prod_spare)
+        stash_any_spare(stash, product, q_prod_spare)
 
-        {
-          acc_used
-          |> Map.merge(synth_used, fn _k, v1, v2 -> v1 + v2 end),
-
-          acc_spare
-          |> Map.merge(synth_spare, fn _k, v1, v2 -> v1 + v2 end)
-        }
+        acc_used
+        |> Map.merge(synth_used, fn _k, v1, v2 -> v1 + v2 end)
       end
     )
   end
 
+  #
+  # XXX for sibling recursive calls to share stash, need Agent
+  #     otherwise dependent on propagation of execess upwards to caller before it can be reused (which may be too late)
+  #
+
   # lesser precursor substances were already correctly accounted during their (excess) production
-  @spec use_any_spare(map, atom, integer) :: {map, integer}
-  defp use_any_spare(all_spares, precursor, q_max_req) do
-    q_spare_avail = Map.get(all_spares, precursor)
+  @spec use_any_spare(pid, atom, integer) :: integer
+  defp use_any_spare(_stash, precursor, q_max_req) do
+    Agent.get_and_update(
+      __MODULE__,
+      fn state ->
+        q_spare_avail = Map.get(state, precursor)
 
-    case q_spare_avail do
-      nil ->
-        {all_spares, 0}
+        case q_spare_avail do
+          nil ->
+            {0, state}
 
-      _ ->
-        q_spare_recycled = Kernel.min(q_spare_avail, q_max_req)
+          _ ->
+            q_spare_recycled = Kernel.min(q_spare_avail, q_max_req)
 
-        {
-          # substances remaining with zero quantity is harmless to accounting
-          Map.get_and_update(all_spares, precursor, fn value -> {value, value - q_spare_recycled} end) |> Kernel.elem(1),
-          q_spare_recycled
-          |> IO.inspect(label: "\nfound #{precursor}")
-        }
-    end
+            {
+              # substances remaining with zero quantity is harmless to accounting
+              q_spare_recycled,
+              # |> IO.inspect(label: "\nfound #{precursor}"),
+
+              Map.get_and_update(state, precursor, fn value -> {value, value - q_spare_recycled} end) |> Kernel.elem(1)
+            }
+        end
+      end
+    )
   end
 
   # by problem definition(?), reactions produce exactly one product
   # sum quantities if any excess already stashed for given substance
-  @spec stash_any_spare(map, atom, integer) :: map
-  defp stash_any_spare(all_spares, product, q_excess) when q_excess < 0, do: raise ArgumentError, message: "negative 'excess'"
+  @spec stash_any_spare(pid, atom, integer) :: :ok
+  defp stash_any_spare(_stash, _product, q_excess) when q_excess < 0, do: raise ArgumentError, message: "negative 'excess'"
 
-  defp stash_any_spare(all_spares, product, q_excess) when q_excess == 0, do: all_spares
+  defp stash_any_spare(_stash, _product, q_excess) when q_excess == 0, do: :ok
 
-  defp stash_any_spare(all_spares, product, q_excess) do
-    all_spares
-    |> Map.merge(%{product => q_excess}, fn _k, v1, v2 -> v1 + v2 end)
-    |> IO.inspect(label: "\nstashed")
+  defp stash_any_spare(_stash, product, q_excess) do
+    Agent.update(
+      __MODULE__,
+      fn state ->
+        state
+        |> Map.merge(%{product => q_excess}, fn _k, v1, v2 -> v1 + v2 end)
+        # |> IO.inspect(label: "\nstashed")
+      end
+    )
   end
 
   # transform "7 A, 1 B => 1 C" into { {1, "C"},  [{7, "A"}, {1, "B"}] }
