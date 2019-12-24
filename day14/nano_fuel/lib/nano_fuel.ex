@@ -17,39 +17,39 @@ defmodule NanoFuel do
   """
 
   @doc """
-  iex> NanoFuel.calc_minimum_ore_for_fuel(~s{
-  ...> 10 ORE => 10 A
-  ...> 1 ORE => 1 B
-  ...> 7 A, 1 B => 1 C
-  ...> 7 A, 1 C => 1 D
-  ...> 7 A, 1 D => 1 E
-  ...> 7 A, 1 E => 1 FUEL
-  ...> })
-  31
-
-  iex> NanoFuel.calc_minimum_ore_for_fuel(~s{
-  ...> 9 ORE => 2 A
-  ...> 8 ORE => 3 B
-  ...> 7 ORE => 5 C
-  ...> 3 A, 4 B => 1 AB
-  ...> 5 B, 7 C => 1 BC
-  ...> 4 C, 1 A => 1 CA
-  ...> 2 AB, 3 BC, 4 CA => 1 FUEL
-  ...> })
-  165
-
-  iex> NanoFuel.calc_minimum_ore_for_fuel(~s{
-  ...> 157 ORE => 5 NZVS
-  ...> 165 ORE => 6 DCFZ
-  ...> 44 XJWVT, 5 KHKGT, 1 QDVJ, 29 NZVS, 9 GPVTF, 48 HKGWZ => 1 FUEL
-  ...> 12 HKGWZ, 1 GPVTF, 8 PSHF => 9 QDVJ
-  ...> 179 ORE => 7 PSHF
-  ...> 177 ORE => 5 HKGWZ
-  ...> 7 DCFZ, 7 PSHF => 2 XJWVT
-  ...> 165 ORE => 2 GPVTF
-  ...> 3 DCFZ, 7 NZVS, 5 HKGWZ, 10 PSHF => 8 KHKGT
-  ...> })
-  13_312
+  #   iex> NanoFuel.calc_minimum_ore_for_fuel(~s{
+  #   ...> 10 ORE => 10 A
+  #   ...> 1 ORE => 1 B
+  #   ...> 7 A, 1 B => 1 C
+  #   ...> 7 A, 1 C => 1 D
+  #   ...> 7 A, 1 D => 1 E
+  #   ...> 7 A, 1 E => 1 FUEL
+  #   ...> })
+  #   31
+  # 
+  #   iex> NanoFuel.calc_minimum_ore_for_fuel(~s{
+  #   ...> 9 ORE => 2 A
+  #   ...> 8 ORE => 3 B
+  #   ...> 7 ORE => 5 C
+  #   ...> 3 A, 4 B => 1 AB
+  #   ...> 5 B, 7 C => 1 BC
+  #   ...> 4 C, 1 A => 1 CA
+  #   ...> 2 AB, 3 BC, 4 CA => 1 FUEL
+  #   ...> })
+  #   165
+  # 
+  #   iex> NanoFuel.calc_minimum_ore_for_fuel(~s{
+  #   ...> 157 ORE => 5 NZVS
+  #   ...> 165 ORE => 6 DCFZ
+  #   ...> 44 XJWVT, 5 KHKGT, 1 QDVJ, 29 NZVS, 9 GPVTF, 48 HKGWZ => 1 FUEL
+  #   ...> 12 HKGWZ, 1 GPVTF, 8 PSHF => 9 QDVJ
+  #   ...> 179 ORE => 7 PSHF
+  #   ...> 177 ORE => 5 HKGWZ
+  #   ...> 7 DCFZ, 7 PSHF => 2 XJWVT
+  #   ...> 165 ORE => 2 GPVTF
+  #   ...> 3 DCFZ, 7 NZVS, 5 HKGWZ, 10 PSHF => 8 KHKGT
+  #   ...> })
+  #   13_312
 
   iex> NanoFuel.calc_minimum_ore_for_fuel(~s{
   ...> 2 VPVL, 7 FWMGM, 2 CXFTF, 11 MNCFX => 1 STKFG
@@ -107,25 +107,32 @@ defmodule NanoFuel do
       Graph.new()
       |> Graph.add_edges(reaction_edges)
 
-    {:ok, stash} =
+    # for sibling recursive calls to share stash, need Agent!
+    # otherwise dependent on propagation of execess upwards to caller
+    # before it can be reused (which may be too late);
+    #
+    # for ease of use, prefer named agent
+    {:ok, _stash_pid} =
       Agent.start_link(fn -> %{} end, name: __MODULE__)
 
     %{:ore => n} =
-      resolve_ingredients(graph, stash, %{:fuel => 1})
+      resolve_ingredients(graph, %{:fuel => 1})
 
     n
   end
 
-  @spec resolve_ingredients(Graph.t(), pid, map) :: {map, map}
-  def resolve_ingredients(_graph, _stash, %{:ore => n}) do
+  @spec resolve_ingredients(Graph.t(), map) :: {map, map}
+  def resolve_ingredients(_graph, _prod_quant, _dbg_lvl \\ 0)
+
+  def resolve_ingredients(_graph, %{:ore => n}, _dbg_lvl) do
     # most basic ingredient always obtainable in exact quantity (w/o anything spare)
     %{:ore => n}
   end
 
-  def resolve_ingredients(graph, stash, prod_quant) do
+  def resolve_ingredients(graph, prod_quant, dbg_lvl) do
     # built-in sanity check: single synthesis target (key-value pair)
     [{product, quantity}] = Enum.into(prod_quant, [])
-    # IO.inspect({product, quantity}, label: "\nwant")
+    log({product, quantity}, "\nwant", dbg_lvl)
 
     Graph.out_neighbors(graph, product)
     |> Enum.sort_by(fn pre -> (Graph.get_shortest_path(graph, pre, :ore) || []) |> Kernel.length() end)
@@ -143,25 +150,28 @@ defmodule NanoFuel do
 
         # at most one connection between any two nodes
         [%Graph.Edge{label: {q_prod_out, q_pre_in}}] = Graph.edges(graph, product, precursor)
-        # IO.inspect({product, q_prod_out, q_pre_in, precursor}, label: "\nratio")
+        log({product, q_prod_out, q_pre_in, precursor}, "ratio", dbg_lvl)
         n_repeat = ceil(quantity / q_prod_out)
         q_pre_req = n_repeat * q_pre_in
 
         # aggressively use stashed excess (if any):
         # even just to reduce (rather than fully eliminate) further production;
         # never mind if any excess reappears as by-product (for stashing)
-        q_pre_avail = use_any_spare(stash, precursor, q_pre_req)
+        q_pre_avail = use_any_spare(precursor, q_pre_req)
 
         effective_q_pre_req = q_pre_req - q_pre_avail
         effective_n_repeat = ceil(effective_q_pre_req / q_pre_in)
+        if effective_n_repeat > n_repeat, do: raise RuntimeError, message: "stash check cannot increase number of reaction repeats"
 
+        # XXX how/when can this be negative number?!
+        log({n_repeat, effective_n_repeat}, "rpt", dbg_lvl)
         q_prod_spare = effective_n_repeat * q_prod_out + q_pre_avail - quantity
 
         # synthesise remainder (if any)
-        synth_used = resolve_ingredients(graph, stash, %{precursor => effective_q_pre_req})
+        synth_used = resolve_ingredients(graph, %{precursor => effective_q_pre_req}, dbg_lvl+1)
 
         # never _less_ produced than required, ...
-        stash_any_spare(stash, product, q_prod_spare)
+        stash_any_spare(precursor, q_prod_spare)
 
         acc_used
         |> Map.merge(synth_used, fn _k, v1, v2 -> v1 + v2 end)
@@ -169,14 +179,9 @@ defmodule NanoFuel do
     )
   end
 
-  #
-  # XXX for sibling recursive calls to share stash, need Agent
-  #     otherwise dependent on propagation of execess upwards to caller before it can be reused (which may be too late)
-  #
-
   # lesser precursor substances were already correctly accounted during their (excess) production
-  @spec use_any_spare(pid, atom, integer) :: integer
-  defp use_any_spare(_stash, precursor, q_max_req) do
+  @spec use_any_spare(atom, integer, integer) :: integer
+  defp use_any_spare(precursor, q_max_req, dbg_lvl \\ 0) do
     Agent.get_and_update(
       __MODULE__,
       fn state ->
@@ -191,8 +196,8 @@ defmodule NanoFuel do
 
             {
               # substances remaining with zero quantity is harmless to accounting
-              q_spare_recycled,
-              # |> IO.inspect(label: "\nfound #{precursor}"),
+              q_spare_recycled
+              |> log("found #{precursor}", dbg_lvl),
 
               Map.get_and_update(state, precursor, fn value -> {value, value - q_spare_recycled} end) |> Kernel.elem(1)
             }
@@ -203,20 +208,45 @@ defmodule NanoFuel do
 
   # by problem definition(?), reactions produce exactly one product
   # sum quantities if any excess already stashed for given substance
-  @spec stash_any_spare(pid, atom, integer) :: :ok
-  defp stash_any_spare(_stash, _product, q_excess) when q_excess < 0, do: raise ArgumentError, message: "negative 'excess'"
+  @spec stash_any_spare(atom, integer, integer) :: :ok
+  defp stash_any_spare(substance, q_excess, dbg_lvl \\ 0)
 
-  defp stash_any_spare(_stash, _product, q_excess) when q_excess == 0, do: :ok
+  defp stash_any_spare(_substance, q_excess, _dbg_lvl) when q_excess < 0, do: raise ArgumentError, message: "negative 'excess'"
 
-  defp stash_any_spare(_stash, product, q_excess) do
+  defp stash_any_spare(_substance, q_excess, _dbg_lvl) when q_excess == 0, do: :ok
+
+  defp stash_any_spare(substance, q_excess, dbg_lvl) do
+    if substance == :fuel, do: raise RuntimeError, message: "refusing to 'stash' FUEL"
+
     Agent.update(
       __MODULE__,
       fn state ->
         state
-        |> Map.merge(%{product => q_excess}, fn _k, v1, v2 -> v1 + v2 end)
-        # |> IO.inspect(label: "\nstashed")
+        |> Map.merge(%{substance => q_excess}, fn _k, v1, v2 -> v1 + v2 end)
+        |> log("stashed", dbg_lvl)
       end
     )
+  end
+
+  # write (to IO) representation of given object with informative label and indented by call level
+  #
+  # starting: top-level
+  #   en route: first level
+  #     deep: second level
+  #
+  # able to tap into pipe (similar to IO.inspect)
+  @spec log(String.t(), String.t(), integer) :: any
+  defp log(obj, label, nesting_level) do
+    msg = Kernel.inspect(obj, label: label)
+
+    Stream.concat(["\n"], Stream.cycle(["  "]))
+    |> Enum.take(1 + nesting_level)
+    |> IO.write()
+
+    "#{label}: #{msg}"
+    |> IO.write()
+
+    obj
   end
 
   # transform "7 A, 1 B => 1 C" into { {1, "C"},  [{7, "A"}, {1, "B"}] }

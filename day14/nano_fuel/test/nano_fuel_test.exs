@@ -1,6 +1,6 @@
 defmodule NanoFuelTest do
   use ExUnit.Case
-  doctest NanoFuel
+  doctest NanoFuel  #, only: [log: 2]
 
   setup do
     my_chemical_equations = """
