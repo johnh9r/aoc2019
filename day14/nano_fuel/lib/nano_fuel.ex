@@ -15,6 +15,51 @@ defmodule NanoFuel do
   * all quantities are integers
   * no undefined products (i.e. w/o synthesis equation)
   """
+  @spec calc_max_fuel_from_ore(String.t(), integer) :: integer
+  def calc_max_fuel_from_ore(equations, kq_ore_avail) do
+    reaction_edges =
+      parse(equations)
+      |> Enum.flat_map(
+        fn {{prod_quant, prod_kind}, quant_ingreds} ->
+          quant_ingreds
+          |> Enum.map(
+            fn {ingred_quant, ingred_kind} ->
+              Graph.Edge.new(prod_kind, ingred_kind, label: {prod_quant, ingred_quant})
+            end
+          )
+        end
+      )
+
+    graph =
+      Graph.new()
+      |> Graph.add_edges(reaction_edges)
+
+    # see below, for rationale for using Agent
+    {:ok, _stash_pid} =
+      Agent.start_link(fn -> %{} end, name: __MODULE__)
+
+    {lo, hi} = _calc_max_fuel_from_ore(graph, kq_ore_avail, 2_000_000, 4_000_000)
+    IO.inspect({lo, hi}, label: "\nresult")
+
+    lo
+  end
+
+  @spec _calc_max_fuel_from_ore(Graph.t(), integer, integer, integer) :: {integer, integer}
+  defp _calc_max_fuel_from_ore(graph, kq_ore_avail, q_fuel_guess_lo, q_fuel_guess_hi) do
+    # reset stash between attempts
+    Agent.update(__MODULE__, fn _state -> %{} end)
+
+    q_half_fuel_diff = div(q_fuel_guess_hi - q_fuel_guess_lo, 2)
+
+    %{:ore => n} =
+      resolve_ingredients(graph, %{:fuel => q_fuel_guess_lo + q_half_fuel_diff})
+
+    cond do
+      n < kq_ore_avail && q_half_fuel_diff > 0 -> _calc_max_fuel_from_ore(graph, kq_ore_avail, q_fuel_guess_lo + q_half_fuel_diff, q_fuel_guess_hi)
+      n > kq_ore_avail && q_half_fuel_diff > 0 -> _calc_max_fuel_from_ore(graph, kq_ore_avail, q_fuel_guess_lo, q_fuel_guess_hi - q_half_fuel_diff)
+      true -> {q_fuel_guess_lo, q_fuel_guess_hi}
+    end
+  end
 
   @doc """
   iex> NanoFuel.calc_minimum_ore_for_fuel(~s{
@@ -261,7 +306,7 @@ defmodule NanoFuel do
 
   # lesser precursor substances were already correctly accounted during their (excess) production
   @spec use_any_spare(atom, integer, integer) :: integer
-  defp use_any_spare(_precursor, _q_max_req, _dbg_lvl \\ 0)
+  # defp use_any_spare(_precursor, _q_max_req, _dbg_lvl \\ 0)
 
   # tacitly ignore attempt to find ore in stash (to which it is never added)
   defp use_any_spare(:ore, _q_max_req, _dbg_lvl), do: 0
@@ -295,7 +340,7 @@ defmodule NanoFuel do
   # by problem definition(?), reactions produce exactly one product
   # sum quantities if any excess already stashed for given substance
   @spec stash_any_spare(atom, integer, integer) :: :ok
-  defp stash_any_spare(_substance, _q_excess, _dbg_lvl \\ 0)
+  # defp stash_any_spare(_substance, _q_excess, _dbg_lvl \\ 0)
 
   defp stash_any_spare(_substance, q_excess, _dbg_lvl) when q_excess < 0, do: raise ArgumentError, message: "negative 'excess'"
 
@@ -325,6 +370,10 @@ defmodule NanoFuel do
   #
   # able to tap into pipe (similar to IO.inspect)
   @spec log(String.t(), String.t(), integer) :: any
+
+  # XXX no-op impl masks chatty impl below
+  defp log(obj, _label, _nesting_level), do: obj
+
   defp log(obj, label, nesting_level) do
     msg = Kernel.inspect(obj, label: label)
 

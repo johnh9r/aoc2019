@@ -65,6 +65,11 @@ defmodule NanoFuelTest do
 
   @tag :challenge_pt1
   test "(part 1) correctly processes personal challenge input", context do
-    assert NanoFuel.calc_minimum_ore_for_fuel(context[:chemical_equations]) == 0
+    assert NanoFuel.calc_minimum_ore_for_fuel(context[:chemical_equations]) == 469_536
+  end
+
+  @tag :challenge_pt2
+  test "(part 2) correctly processes personal challenge input", context do
+    assert NanoFuel.calc_max_fuel_from_ore(context[:chemical_equations], 1_000_000_000_000) == 3_343_477
   end
 end
