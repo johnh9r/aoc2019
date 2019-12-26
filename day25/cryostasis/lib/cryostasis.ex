@@ -61,9 +61,20 @@ defmodule Cryostasis do
   @doc """
   (part 1)
   """
-  @spec discover_password_for_main_airlock([integer]) :: :ok
+  @spec explore_interactively([integer]) :: :ok
   def discover_password_for_main_airlock(firmware) do
     {:ok, _pid} = WorldAffairs.initialise([])
+    run_adventure_game(firmware)
+  end
+
+  @spec issue_command_sequence([integer], String.t()) :: :ok
+  def issue_command_sequence(firmware, commands) do
+    cmd_char_seq =
+      commands
+      |> String.split(~r//, trim: true)
+      |> Enum.map(fn c -> <<i::8>> = c; i end)
+
+    {:ok, _pid} = WorldAffairs.initialise(cmd_char_seq)
     run_adventure_game(firmware)
   end
 

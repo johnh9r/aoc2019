@@ -11,7 +11,40 @@ defmodule CryostasisTest do
   end
 
   test "(part 1) run interactive text adventure", context do
-    Cryostasis.discover_password_for_main_airlock(context[:firmware])
+    # Cryostasis.explore_interactively(context[:firmware])
+    Cryostasis.issue_command_sequence(
+      context[:firmware],
+      """
+      north
+      east
+      south
+      take dehydrated water
+      north
+      west
+      north
+      east
+      south
+      take antenna
+      west
+      take hypercube
+      east
+      north
+      west
+      north
+      east
+      take candy cane
+      west
+      south
+      south
+      south
+      west
+      south
+      west
+      west
+      """
+    )
     # XXX no structured output from interactive session so no assertion
+    # correct item combo:  antenna, hypercube, dehydrated water, candy cane
+    # doorlock code: 2147502592
   end
 end
