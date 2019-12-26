@@ -17,39 +17,39 @@ defmodule NanoFuel do
   """
 
   @doc """
-  #   iex> NanoFuel.calc_minimum_ore_for_fuel(~s{
-  #   ...> 10 ORE => 10 A
-  #   ...> 1 ORE => 1 B
-  #   ...> 7 A, 1 B => 1 C
-  #   ...> 7 A, 1 C => 1 D
-  #   ...> 7 A, 1 D => 1 E
-  #   ...> 7 A, 1 E => 1 FUEL
-  #   ...> })
-  #   31
-  # 
-  #   iex> NanoFuel.calc_minimum_ore_for_fuel(~s{
-  #   ...> 9 ORE => 2 A
-  #   ...> 8 ORE => 3 B
-  #   ...> 7 ORE => 5 C
-  #   ...> 3 A, 4 B => 1 AB
-  #   ...> 5 B, 7 C => 1 BC
-  #   ...> 4 C, 1 A => 1 CA
-  #   ...> 2 AB, 3 BC, 4 CA => 1 FUEL
-  #   ...> })
-  #   165
-  # 
-  #   iex> NanoFuel.calc_minimum_ore_for_fuel(~s{
-  #   ...> 157 ORE => 5 NZVS
-  #   ...> 165 ORE => 6 DCFZ
-  #   ...> 44 XJWVT, 5 KHKGT, 1 QDVJ, 29 NZVS, 9 GPVTF, 48 HKGWZ => 1 FUEL
-  #   ...> 12 HKGWZ, 1 GPVTF, 8 PSHF => 9 QDVJ
-  #   ...> 179 ORE => 7 PSHF
-  #   ...> 177 ORE => 5 HKGWZ
-  #   ...> 7 DCFZ, 7 PSHF => 2 XJWVT
-  #   ...> 165 ORE => 2 GPVTF
-  #   ...> 3 DCFZ, 7 NZVS, 5 HKGWZ, 10 PSHF => 8 KHKGT
-  #   ...> })
-  #   13_312
+  iex> NanoFuel.calc_minimum_ore_for_fuel(~s{
+  ...> 10 ORE => 10 A
+  ...> 1 ORE => 1 B
+  ...> 7 A, 1 B => 1 C
+  ...> 7 A, 1 C => 1 D
+  ...> 7 A, 1 D => 1 E
+  ...> 7 A, 1 E => 1 FUEL
+  ...> })
+  31
+  
+  iex> NanoFuel.calc_minimum_ore_for_fuel(~s{
+  ...> 9 ORE => 2 A
+  ...> 8 ORE => 3 B
+  ...> 7 ORE => 5 C
+  ...> 3 A, 4 B => 1 AB
+  ...> 5 B, 7 C => 1 BC
+  ...> 4 C, 1 A => 1 CA
+  ...> 2 AB, 3 BC, 4 CA => 1 FUEL
+  ...> })
+  165
+  
+  iex> NanoFuel.calc_minimum_ore_for_fuel(~s{
+  ...> 157 ORE => 5 NZVS
+  ...> 165 ORE => 6 DCFZ
+  ...> 44 XJWVT, 5 KHKGT, 1 QDVJ, 29 NZVS, 9 GPVTF, 48 HKGWZ => 1 FUEL
+  ...> 12 HKGWZ, 1 GPVTF, 8 PSHF => 9 QDVJ
+  ...> 179 ORE => 7 PSHF
+  ...> 177 ORE => 5 HKGWZ
+  ...> 7 DCFZ, 7 PSHF => 2 XJWVT
+  ...> 165 ORE => 2 GPVTF
+  ...> 3 DCFZ, 7 NZVS, 5 HKGWZ, 10 PSHF => 8 KHKGT
+  ...> })
+  13_312
 
   iex> NanoFuel.calc_minimum_ore_for_fuel(~s{
   ...> 2 VPVL, 7 FWMGM, 2 CXFTF, 11 MNCFX => 1 STKFG
@@ -121,7 +121,7 @@ defmodule NanoFuel do
     n
   end
 
-  @spec resolve_ingredients(Graph.t(), map) :: {map, map}
+  @spec resolve_ingredients(Graph.t(), map) :: map
   def resolve_ingredients(_graph, _prod_quant, _dbg_lvl \\ 0)
 
   def resolve_ingredients(_graph, %{:ore => n}, _dbg_lvl) do
@@ -132,56 +132,141 @@ defmodule NanoFuel do
   def resolve_ingredients(graph, prod_quant, dbg_lvl) do
     # built-in sanity check: single synthesis target (key-value pair)
     [{product, quantity}] = Enum.into(prod_quant, [])
-    log({product, quantity}, "\nwant", dbg_lvl)
+    log({product, quantity}, "want", dbg_lvl)
 
+    # given: demand for 37 W (from superordinate equations),
+    #         i.e. %{w => 37}, so product = :w and demand = 37
+    #
+    # given: "5 W <= 3 X + 8 Z" (for any actual synthesis that may be necessary)
+    #
+    #     product vs precursors
+    #  q_prod_out    q_pre_in
+    #
+    #    a.k.a. W 5:3 X
+    #           W 5:8 Z
+    #
+    # given: stash of 9 W (from earlier synthesis reactions)
+    #
+    # (1) check whether stash can partially or fully meet demand:
+    #     (ore is never admitted to stash so will always be freshly mined in base case)
+    #     reduce demand (quantity) by whatever is found in stash
+    #     [here: unmet_demand = 37 - 9 = 28 (W)]
+    #
+    # (2a) if remaining demand is zero, return zero ore consumption to caller (finished)
+    #
+    # (2b) if remaining demand is non-zero, then proceed to synthesis,
+    #     iterating over precursor substances  [here: X, Z]
+    #     between stash supply and fresh synthesis, demand is always met
+    #     (and assuming "1 FUEL <= ...", fuel can never be overproduced and stashed)
+    #
+    # (3) fundamentally, given reaction needs to run one or more times;
+    #     it can meet remaining demand only in certain increments;
+    #     it must never produce less than is in demand;
+    #     it may inadvertently produce more product than is in demand,
+    #     in which case any excess product is stashed
+    #     [here:
+    #         n_repeat = ceil(unmet_demand / q_prod_out) = ceil(28 / 5) = 6
+    #         q_prod_excess = n_repeat * q_prod_out - unmet_demand = 6 * 5 - 28 = 2
+    #     ]
+    #
+    # (4) for each precursor, calculate demand
+    #     demand = n_repeat * q_pre_in
+    #     [here:  demand_X = 6 * 3 = 18,  demand_Y = 6 * 8 = 48]
+    #     each such subordinate demand is resolved recursively
+    #     [here:  18 X or 48 Z, respectively, in place of 37 W -- repeat from top]
+    #
+    # (5) return cumulative ore consumption to caller
+
+    # aggressively use stashed excess (if any):
+    # even just to reduce (rather than fully eliminate) further production;
+    # never mind if any excess reappears as by-product (for stashing);
+    # no rounding yet: e.g. meet requirement exactly if stash allows
+    q_prod_avail = use_any_spare(product, quantity, dbg_lvl)
+    # guaranteed non-negative
+    q_prod_req = quantity - q_prod_avail
+
+    case q_prod_req do
+      0 ->
+        # (2a) nothing left to do, no ore consumed
+        %{}
+
+      _ ->
+        # (2b) trigger synthesis of unmet demand
+        synthesise(graph, product, q_prod_req, dbg_lvl)
+    end
+  end
+
+  @spec synthesise(Graph.t(), atom, integer, integer) :: map
+  defp synthesise(graph, product, product_quantity, dbg_lvl) do
+    {q_prod_out, quant_precursors} = prep_synth_reaction(graph, product)
+
+    # (3) may need to run reaction repeated,
+    # e.g "4 A <= 18 ORE" can produce 4A, 8A, ..., 20A, ...
+    # nearest bigger integer multiple of output quantum, e.g. 3 instead of 2.7818
+    n_repeat =
+      ceil(product_quantity / q_prod_out)
+      |> log("rpt", dbg_lvl)
+
+    synthesis_consumption =
+      quant_precursors
+      # iteratively, focus on each precursor substance in turn
+      |> Enum.reduce(
+        %{},
+        fn {q_pre_in, precursor}, acc_used ->
+          log({product, q_prod_out, q_pre_in, precursor}, "ratio", dbg_lvl)
+          synth_used = resolve_ingredients(graph, %{precursor => n_repeat * q_pre_in}, dbg_lvl+1)
+
+          acc_used
+          |> Map.merge(synth_used, fn _k, v1, v2 -> v1 + v2 end)
+        end
+      )
+
+    # (3) when all precursors can been produced and combined, then some excess product may have resulted (once)
+    q_prod_spare =
+      n_repeat * q_prod_out - product_quantity
+      |> log("spare #{product}", dbg_lvl)
+
+    stash_any_spare(product, q_prod_spare, dbg_lvl)
+
+    synthesis_consumption
+  end
+
+  @spec prep_synth_reaction(Graph.t(), atom) :: {integer, [{integer, atom}]}
+  defp prep_synth_reaction(graph, product) do
     Graph.out_neighbors(graph, product)
     |> Enum.sort_by(fn pre -> (Graph.get_shortest_path(graph, pre, :ore) || []) |> Kernel.length() end)
     |> Enum.reverse()
-    |> Enum.reduce(
-      %{},
-      fn precursor, acc_used ->
-        # (gen)
-        #        1 BC      <=   ... (iteration over neighbouring nodes)
-        #        ^ ^          +            7           C
-        # quantity product      prod_out=1:7=q_pre_in  precursor
-        #        v v
-        # (spec)
-        #      3*1 BC      <=       (all else as above)
-
+    |> Enum.map(
+      fn precursor ->
         # at most one connection between any two nodes
         [%Graph.Edge{label: {q_prod_out, q_pre_in}}] = Graph.edges(graph, product, precursor)
-        log({product, q_prod_out, q_pre_in, precursor}, "ratio", dbg_lvl)
-        n_repeat = ceil(quantity / q_prod_out)
-        q_pre_req = n_repeat * q_pre_in
 
-        # aggressively use stashed excess (if any):
-        # even just to reduce (rather than fully eliminate) further production;
-        # never mind if any excess reappears as by-product (for stashing)
-        q_pre_avail = use_any_spare(precursor, q_pre_req)
+        {q_prod_out, {q_pre_in, precursor}}
+      end
+    )
+    |> Enum.reduce(
+      {nil, []},
+      fn {q_prod_out, {q_pre_in, precursor}}, {x, quant_precursors} = _acc ->
+        q_prod_out =
+          case {q_prod_out, x} do
+            {n, nil} -> n
+            {n, n} -> n
+            _ -> raise RuntimeError, message: "inconsistent product quantity out of related precursor reactions"
+          end
 
-        effective_q_pre_req = q_pre_req - q_pre_avail
-        effective_n_repeat = ceil(effective_q_pre_req / q_pre_in)
-        if effective_n_repeat > n_repeat, do: raise RuntimeError, message: "stash check cannot increase number of reaction repeats"
-
-        # XXX how/when can this be negative number?!
-        log({n_repeat, effective_n_repeat}, "rpt", dbg_lvl)
-        q_prod_spare = effective_n_repeat * q_prod_out + q_pre_avail - quantity
-
-        # synthesise remainder (if any)
-        synth_used = resolve_ingredients(graph, %{precursor => effective_q_pre_req}, dbg_lvl+1)
-
-        # never _less_ produced than required, ...
-        stash_any_spare(precursor, q_prod_spare)
-
-        acc_used
-        |> Map.merge(synth_used, fn _k, v1, v2 -> v1 + v2 end)
+        {q_prod_out, [{q_pre_in, precursor} | quant_precursors]}
       end
     )
   end
 
   # lesser precursor substances were already correctly accounted during their (excess) production
   @spec use_any_spare(atom, integer, integer) :: integer
-  defp use_any_spare(precursor, q_max_req, dbg_lvl \\ 0) do
+  defp use_any_spare(_precursor, _q_max_req, _dbg_lvl \\ 0)
+
+  # tacitly ignore attempt to find ore in stash (to which it is never added)
+  defp use_any_spare(:ore, _q_max_req, _dbg_lvl), do: 0
+
+  defp use_any_spare(precursor, q_max_req, dbg_lvl) do
     Agent.get_and_update(
       __MODULE__,
       fn state ->
@@ -189,6 +274,7 @@ defmodule NanoFuel do
 
         case q_spare_avail do
           nil ->
+            log(nil, "miss #{precursor}", dbg_lvl)
             {0, state}
 
           _ ->
@@ -197,7 +283,7 @@ defmodule NanoFuel do
             {
               # substances remaining with zero quantity is harmless to accounting
               q_spare_recycled
-              |> log("found #{precursor}", dbg_lvl),
+              |> log("hit #{precursor}", dbg_lvl),
 
               Map.get_and_update(state, precursor, fn value -> {value, value - q_spare_recycled} end) |> Kernel.elem(1)
             }
@@ -209,15 +295,18 @@ defmodule NanoFuel do
   # by problem definition(?), reactions produce exactly one product
   # sum quantities if any excess already stashed for given substance
   @spec stash_any_spare(atom, integer, integer) :: :ok
-  defp stash_any_spare(substance, q_excess, dbg_lvl \\ 0)
+  defp stash_any_spare(_substance, _q_excess, _dbg_lvl \\ 0)
 
   defp stash_any_spare(_substance, q_excess, _dbg_lvl) when q_excess < 0, do: raise ArgumentError, message: "negative 'excess'"
 
   defp stash_any_spare(_substance, q_excess, _dbg_lvl) when q_excess == 0, do: :ok
 
-  defp stash_any_spare(substance, q_excess, dbg_lvl) do
-    if substance == :fuel, do: raise RuntimeError, message: "refusing to 'stash' FUEL"
+  # tacitly ignore unnecessary attempts to stash ore (which is always readily available in unlimited quantities)
+  defp stash_any_spare(:ore, _q_excess, _dbg_lvl), do: :ok
 
+  defp stash_any_spare(:fuel, q_excess, _dbg_lvl), do: raise ArgumentError, message: "refusing to 'stash' (#{q_excess}) FUEL"
+
+  defp stash_any_spare(substance, q_excess, dbg_lvl) do
     Agent.update(
       __MODULE__,
       fn state ->
@@ -239,12 +328,11 @@ defmodule NanoFuel do
   defp log(obj, label, nesting_level) do
     msg = Kernel.inspect(obj, label: label)
 
-    Stream.concat(["\n"], Stream.cycle(["  "]))
-    |> Enum.take(1 + nesting_level)
-    |> IO.write()
+    prefix =
+      Stream.concat(["\n"], Stream.cycle(["  "]))
+      |> Enum.take(1 + nesting_level)
 
-    "#{label}: #{msg}"
-    |> IO.write()
+    IO.write(:stderr, "#{prefix}#{label}: #{msg}")
 
     obj
   end
